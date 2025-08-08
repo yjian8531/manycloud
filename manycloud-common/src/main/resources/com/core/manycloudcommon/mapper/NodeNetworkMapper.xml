@@ -1,0 +1,260 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="com.core.manycloudcommon.mapper.NodeNetworkMapper" >
+  <resultMap id="BaseResultMap" type="com.core.manycloudcommon.entity.NodeNetwork" >
+    <id column="id" property="id" jdbcType="INTEGER" />
+    <result column="node_id" property="nodeId" jdbcType="INTEGER" />
+    <result column="model_id" property="modelId" jdbcType="INTEGER" />
+    <result column="type" property="type" jdbcType="INTEGER" />
+    <result column="network_type" property="networkType" jdbcType="VARCHAR" />
+    <result column="network_param" property="networkParam" jdbcType="VARCHAR" />
+    <result column="min_num" property="minNum" jdbcType="DECIMAL" />
+    <result column="max_num" property="maxNum" jdbcType="DECIMAL" />
+    <result column="item_num" property="itemNum" jdbcType="DECIMAL" />
+    <result column="extend_bl" property="extendBl" jdbcType="VARCHAR" />
+    <result column="remark" property="remark" jdbcType="VARCHAR" />
+    <result column="status" property="status" jdbcType="INTEGER" />
+    <result column="create_time" property="createTime" jdbcType="TIMESTAMP" />
+    <result column="update_time" property="updateTime" jdbcType="TIMESTAMP" />
+    <result column="item" property="item" jdbcType="DECIMAL" />
+    <result column="price" property="price" jdbcType="DECIMAL" />
+    <result column="modelConfig" property="modelConfig" jdbcType="VARCHAR" />
+  </resultMap>
+  <sql id="Base_Column_List" >
+    id, node_id, model_id, type, network_type, network_param, min_num, max_num, item_num, 
+    extend_bl, remark, status, create_time, update_time
+  </sql>
+  <select id="selectByPrimaryKey" resultMap="BaseResultMap" parameterType="java.lang.Integer" >
+    select 
+    <include refid="Base_Column_List" />
+    from t_node_network
+    where id = #{id,jdbcType=INTEGER}
+  </select>
+
+  <select id="selectConfigByNodeId" resultType="com.core.manycloudcommon.vo.node.NodeModelConfigVO" parameterType="java.lang.Integer" >
+    select
+    id,
+    case when type = 0 then CONCAT('带宽:',network_type) else CONCAT('流量:',network_type) end as config
+    from t_node_network
+    where node_id = #{nodeId,jdbcType=INTEGER}
+  </select>
+
+
+  <select id="selectList" resultMap="BaseResultMap" parameterType="java.lang.Integer" >
+    select
+    nn.id, nn.node_id, nn.model_id, nn.type, nn.network_type, nn.network_param, nn.min_num, nn.max_num, nn.item_num,
+    nn.extend_bl, nn.remark, nn.status, nn.create_time, nn.update_time,
+    case when nm.id is null then null else CONCAT(nm.cpu_val,'C', nm.ram_val,'G') end  as modelConfig
+    from
+      t_node_network as nn
+    left join
+      t_node_model as nm on nm.id = nn.model_id
+    where
+      1 = 1
+    <if test="nodeId != null" >
+      and nn.node_id = #{nodeId,jdbcType=INTEGER}
+    </if>
+    order by nn.id desc
+  </select>
+
+  <select id="selectByNode" resultMap="BaseResultMap" parameterType="java.lang.Integer" >
+    select
+    <include refid="Base_Column_List" />
+    from t_node_network
+    where
+      node_id = #{nodeId,jdbcType=INTEGER}
+    and
+      type = #{type,jdbcType=INTEGER}
+    <if test="modelId != null" >
+      and model_id = #{modelId,jdbcType=INTEGER}
+    </if>
+    <if test="modelId == null" >
+      and model_id is null
+    </if>
+  </select>
+
+  <select id="selectByNodeIds" resultMap="BaseResultMap" parameterType="java.util.List" >
+    select
+      nn.id, nn.node_id, nn.model_id, nn.type, nn.network_type, nn.network_param, nn.min_num, nn.max_num, nn.item_num,
+      nn.extend_bl, nn.remark, nn.status, nn.create_time, nn.update_time,IFNULL(np.item,0.0)as item,IFNULL(np.price,0.0)as price
+    from
+      t_node_network as nn
+    left join
+      t_node_price as np on np.node_id = nn.node_id and np.period = 1 and np.config_id = nn.id and np.config_type = 'network'
+    where
+      nn.node_id in
+    <foreach item="item" collection="list" separator="," open="(" close=")">
+      #{item,jdbcType=INTEGER}
+    </foreach>
+  </select>
+
+  <delete id="deleteByPrimaryKey" parameterType="java.lang.Integer" >
+    delete from t_node_network
+    where id = #{id,jdbcType=INTEGER}
+  </delete>
+  <insert id="insert" parameterType="com.core.manycloudcommon.entity.NodeNetwork" >
+    <selectKey resultType="java.lang.Integer" keyProperty="id" order="AFTER" >
+      SELECT LAST_INSERT_ID()
+    </selectKey>
+    insert into t_node_network (node_id, model_id, type, 
+      network_type, network_param, min_num, 
+      max_num, item_num, extend_bl, 
+      remark, status, create_time, 
+      update_time)
+    values (#{nodeId,jdbcType=INTEGER}, #{modelId,jdbcType=INTEGER}, #{type,jdbcType=INTEGER}, 
+      #{networkType,jdbcType=VARCHAR}, #{networkParam,jdbcType=VARCHAR}, #{minNum,jdbcType=DECIMAL}, 
+      #{maxNum,jdbcType=DECIMAL}, #{itemNum,jdbcType=DECIMAL}, #{extendBl,jdbcType=VARCHAR}, 
+      #{remark,jdbcType=VARCHAR}, #{status,jdbcType=INTEGER}, #{createTime,jdbcType=TIMESTAMP}, 
+      #{updateTime,jdbcType=TIMESTAMP})
+  </insert>
+  <insert id="insertSelective" parameterType="com.core.manycloudcommon.entity.NodeNetwork" >
+    <selectKey resultType="java.lang.Integer" keyProperty="id" order="AFTER" >
+      SELECT LAST_INSERT_ID()
+    </selectKey>
+    insert into t_node_network
+    <trim prefix="(" suffix=")" suffixOverrides="," >
+      <if test="nodeId != null" >
+        node_id,
+      </if>
+      <if test="modelId != null" >
+        model_id,
+      </if>
+      <if test="type != null" >
+        type,
+      </if>
+      <if test="networkType != null" >
+        network_type,
+      </if>
+      <if test="networkParam != null" >
+        network_param,
+      </if>
+      <if test="minNum != null" >
+        min_num,
+      </if>
+      <if test="maxNum != null" >
+        max_num,
+      </if>
+      <if test="itemNum != null" >
+        item_num,
+      </if>
+      <if test="extendBl != null" >
+        extend_bl,
+      </if>
+      <if test="remark != null" >
+        remark,
+      </if>
+      <if test="status != null" >
+        status,
+      </if>
+      <if test="createTime != null" >
+        create_time,
+      </if>
+      <if test="updateTime != null" >
+        update_time,
+      </if>
+    </trim>
+    <trim prefix="values (" suffix=")" suffixOverrides="," >
+      <if test="nodeId != null" >
+        #{nodeId,jdbcType=INTEGER},
+      </if>
+      <if test="modelId != null" >
+        #{modelId,jdbcType=INTEGER},
+      </if>
+      <if test="type != null" >
+        #{type,jdbcType=INTEGER},
+      </if>
+      <if test="networkType != null" >
+        #{networkType,jdbcType=VARCHAR},
+      </if>
+      <if test="networkParam != null" >
+        #{networkParam,jdbcType=VARCHAR},
+      </if>
+      <if test="minNum != null" >
+        #{minNum,jdbcType=DECIMAL},
+      </if>
+      <if test="maxNum != null" >
+        #{maxNum,jdbcType=DECIMAL},
+      </if>
+      <if test="itemNum != null" >
+        #{itemNum,jdbcType=DECIMAL},
+      </if>
+      <if test="extendBl != null" >
+        #{extendBl,jdbcType=VARCHAR},
+      </if>
+      <if test="remark != null" >
+        #{remark,jdbcType=VARCHAR},
+      </if>
+      <if test="status != null" >
+        #{status,jdbcType=INTEGER},
+      </if>
+      <if test="createTime != null" >
+        #{createTime,jdbcType=TIMESTAMP},
+      </if>
+      <if test="updateTime != null" >
+        #{updateTime,jdbcType=TIMESTAMP},
+      </if>
+    </trim>
+  </insert>
+  <update id="updateByPrimaryKeySelective" parameterType="com.core.manycloudcommon.entity.NodeNetwork" >
+    update t_node_network
+    <set >
+      <if test="nodeId != null" >
+        node_id = #{nodeId,jdbcType=INTEGER},
+      </if>
+      <if test="modelId != null" >
+        model_id = #{modelId,jdbcType=INTEGER},
+      </if>
+      <if test="type != null" >
+        type = #{type,jdbcType=INTEGER},
+      </if>
+      <if test="networkType != null" >
+        network_type = #{networkType,jdbcType=VARCHAR},
+      </if>
+      <if test="networkParam != null" >
+        network_param = #{networkParam,jdbcType=VARCHAR},
+      </if>
+      <if test="minNum != null" >
+        min_num = #{minNum,jdbcType=DECIMAL},
+      </if>
+      <if test="maxNum != null" >
+        max_num = #{maxNum,jdbcType=DECIMAL},
+      </if>
+      <if test="itemNum != null" >
+        item_num = #{itemNum,jdbcType=DECIMAL},
+      </if>
+      <if test="extendBl != null" >
+        extend_bl = #{extendBl,jdbcType=VARCHAR},
+      </if>
+      <if test="remark != null" >
+        remark = #{remark,jdbcType=VARCHAR},
+      </if>
+      <if test="status != null" >
+        status = #{status,jdbcType=INTEGER},
+      </if>
+      <if test="createTime != null" >
+        create_time = #{createTime,jdbcType=TIMESTAMP},
+      </if>
+      <if test="updateTime != null" >
+        update_time = #{updateTime,jdbcType=TIMESTAMP},
+      </if>
+    </set>
+    where id = #{id,jdbcType=INTEGER}
+  </update>
+  <update id="updateByPrimaryKey" parameterType="com.core.manycloudcommon.entity.NodeNetwork" >
+    update t_node_network
+    set node_id = #{nodeId,jdbcType=INTEGER},
+      model_id = #{modelId,jdbcType=INTEGER},
+      type = #{type,jdbcType=INTEGER},
+      network_type = #{networkType,jdbcType=VARCHAR},
+      network_param = #{networkParam,jdbcType=VARCHAR},
+      min_num = #{minNum,jdbcType=DECIMAL},
+      max_num = #{maxNum,jdbcType=DECIMAL},
+      item_num = #{itemNum,jdbcType=DECIMAL},
+      extend_bl = #{extendBl,jdbcType=VARCHAR},
+      remark = #{remark,jdbcType=VARCHAR},
+      status = #{status,jdbcType=INTEGER},
+      create_time = #{createTime,jdbcType=TIMESTAMP},
+      update_time = #{updateTime,jdbcType=TIMESTAMP}
+    where id = #{id,jdbcType=INTEGER}
+  </update>
+</mapper>

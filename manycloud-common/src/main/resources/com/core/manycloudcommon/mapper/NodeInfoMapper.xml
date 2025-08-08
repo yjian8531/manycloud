@@ -1,0 +1,440 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="com.core.manycloudcommon.mapper.NodeInfoMapper" >
+  <resultMap id="BaseResultMap" type="com.core.manycloudcommon.entity.NodeInfo" >
+    <id column="id" property="id" jdbcType="INTEGER" />
+    <result column="label" property="label" jdbcType="VARCHAR" />
+    <result column="node_val" property="nodeVal" jdbcType="VARCHAR" />
+    <result column="node_param" property="nodeParam" jdbcType="VARCHAR" />
+    <result column="continent_id" property="continentId" jdbcType="INTEGER" />
+    <result column="country_id" property="countryId" jdbcType="INTEGER" />
+    <result column="province_id" property="provinceId" jdbcType="INTEGER" />
+    <result column="city_id" property="cityId" jdbcType="INTEGER" />
+    <result column="node_name" property="nodeName" jdbcType="VARCHAR" />
+    <result column="sorting" property="sorting" jdbcType="INTEGER" />
+    <result column="remark" property="remark" jdbcType="VARCHAR" />
+    <result column="status" property="status" jdbcType="INTEGER" />
+    <result column="create_time" property="createTime" jdbcType="TIMESTAMP" />
+    <result column="update_time" property="updateTime" jdbcType="TIMESTAMP" />
+    <result column="bd_num" property="bdNum" jdbcType="INTEGER"/>
+  </resultMap>
+  <sql id="Base_Column_List" >
+    id, label, node_val, node_param, continent_id, country_id, province_id, city_id, 
+    node_name, sorting, remark, status, create_time, update_time
+  </sql>
+  <select id="selectByPrimaryKey" resultMap="BaseResultMap" parameterType="java.lang.Integer" >
+    select 
+    <include refid="Base_Column_List" />
+    from t_node_info
+    where id = #{id,jdbcType=INTEGER}
+  </select>
+
+
+  <select id="selectAll" resultMap="BaseResultMap">
+    select
+    <include refid="Base_Column_List" />
+    from t_node_info
+  </select>
+
+  <select id="selectByLabel" resultMap="BaseResultMap" parameterType="java.lang.String" >
+    select
+    <include refid="Base_Column_List" />
+    from t_node_info
+    where
+    1 = 1
+    <if test="label != null" >
+      and label = #{label,jdbcType=VARCHAR}
+    </if>
+
+  </select>
+
+  <select id="selectNick" resultType="java.lang.String" parameterType="java.lang.Integer" >
+    select
+        CONCAT_WS('-',co.country_name,pr.province_name,n.node_name)as str
+    from
+        t_node_info as n
+    left join
+        t_region_city as ci on ci.id = n.city_id
+    left join
+        t_region_province as pr on pr.id = n.province_id
+    left join
+        t_region_country as co on co.id = n.country_id
+    where n.id = #{nodeId,jdbcType=INTEGER}
+  </select>
+
+  <delete id="deleteByPrimaryKey" parameterType="java.lang.Integer" >
+    delete from t_node_info
+    where id = #{id,jdbcType=INTEGER}
+  </delete>
+  <insert id="insert" parameterType="com.core.manycloudcommon.entity.NodeInfo" >
+    <selectKey resultType="java.lang.Integer" keyProperty="id" order="AFTER" >
+      SELECT LAST_INSERT_ID()
+    </selectKey>
+    insert into t_node_info (label, node_val, node_param, 
+      continent_id, country_id, province_id, 
+      city_id, node_name, sorting, 
+      remark, status, create_time, 
+      update_time)
+    values (#{label,jdbcType=VARCHAR}, #{nodeVal,jdbcType=VARCHAR}, #{nodeParam,jdbcType=VARCHAR}, 
+      #{continentId,jdbcType=INTEGER}, #{countryId,jdbcType=INTEGER}, #{provinceId,jdbcType=INTEGER}, 
+      #{cityId,jdbcType=INTEGER}, #{nodeName,jdbcType=VARCHAR}, #{sorting,jdbcType=INTEGER}, 
+      #{remark,jdbcType=VARCHAR}, #{status,jdbcType=INTEGER}, #{createTime,jdbcType=TIMESTAMP}, 
+      #{updateTime,jdbcType=TIMESTAMP})
+  </insert>
+  <insert id="insertSelective" parameterType="com.core.manycloudcommon.entity.NodeInfo" >
+    <selectKey resultType="java.lang.Integer" keyProperty="id" order="AFTER" >
+      SELECT LAST_INSERT_ID()
+    </selectKey>
+    insert into t_node_info
+    <trim prefix="(" suffix=")" suffixOverrides="," >
+      <if test="label != null" >
+        label,
+      </if>
+      <if test="nodeVal != null" >
+        node_val,
+      </if>
+      <if test="nodeParam != null" >
+        node_param,
+      </if>
+      <if test="continentId != null" >
+        continent_id,
+      </if>
+      <if test="countryId != null" >
+        country_id,
+      </if>
+      <if test="provinceId != null" >
+        province_id,
+      </if>
+      <if test="cityId != null" >
+        city_id,
+      </if>
+      <if test="nodeName != null" >
+        node_name,
+      </if>
+      <if test="sorting != null" >
+        sorting,
+      </if>
+      <if test="remark != null" >
+        remark,
+      </if>
+      <if test="status != null" >
+        status,
+      </if>
+      <if test="createTime != null" >
+        create_time,
+      </if>
+      <if test="updateTime != null" >
+        update_time,
+      </if>
+    </trim>
+    <trim prefix="values (" suffix=")" suffixOverrides="," >
+      <if test="label != null" >
+        #{label,jdbcType=VARCHAR},
+      </if>
+      <if test="nodeVal != null" >
+        #{nodeVal,jdbcType=VARCHAR},
+      </if>
+      <if test="nodeParam != null" >
+        #{nodeParam,jdbcType=VARCHAR},
+      </if>
+      <if test="continentId != null" >
+        #{continentId,jdbcType=INTEGER},
+      </if>
+      <if test="countryId != null" >
+        #{countryId,jdbcType=INTEGER},
+      </if>
+      <if test="provinceId != null" >
+        #{provinceId,jdbcType=INTEGER},
+      </if>
+      <if test="cityId != null" >
+        #{cityId,jdbcType=INTEGER},
+      </if>
+      <if test="nodeName != null" >
+        #{nodeName,jdbcType=VARCHAR},
+      </if>
+      <if test="sorting != null" >
+        #{sorting,jdbcType=INTEGER},
+      </if>
+      <if test="remark != null" >
+        #{remark,jdbcType=VARCHAR},
+      </if>
+      <if test="status != null" >
+        #{status,jdbcType=INTEGER},
+      </if>
+      <if test="createTime != null" >
+        #{createTime,jdbcType=TIMESTAMP},
+      </if>
+      <if test="updateTime != null" >
+        #{updateTime,jdbcType=TIMESTAMP},
+      </if>
+    </trim>
+  </insert>
+  <update id="updateByPrimaryKeySelective" parameterType="com.core.manycloudcommon.entity.NodeInfo" >
+    update t_node_info
+    <set >
+      <if test="label != null" >
+        label = #{label,jdbcType=VARCHAR},
+      </if>
+      <if test="nodeVal != null" >
+        node_val = #{nodeVal,jdbcType=VARCHAR},
+      </if>
+      <if test="nodeParam != null" >
+        node_param = #{nodeParam,jdbcType=VARCHAR},
+      </if>
+      <if test="continentId != null" >
+        continent_id = #{continentId,jdbcType=INTEGER},
+      </if>
+      <if test="countryId != null" >
+        country_id = #{countryId,jdbcType=INTEGER},
+      </if>
+      <if test="provinceId != null" >
+        province_id = #{provinceId,jdbcType=INTEGER},
+      </if>
+      <if test="cityId != null" >
+        city_id = #{cityId,jdbcType=INTEGER},
+      </if>
+      <if test="nodeName != null" >
+        node_name = #{nodeName,jdbcType=VARCHAR},
+      </if>
+      <if test="sorting != null" >
+        sorting = #{sorting,jdbcType=INTEGER},
+      </if>
+      <if test="remark != null" >
+        remark = #{remark,jdbcType=VARCHAR},
+      </if>
+      <if test="status != null" >
+        status = #{status,jdbcType=INTEGER},
+      </if>
+      <if test="createTime != null" >
+        create_time = #{createTime,jdbcType=TIMESTAMP},
+      </if>
+      <if test="updateTime != null" >
+        update_time = #{updateTime,jdbcType=TIMESTAMP},
+      </if>
+    </set>
+    where id = #{id,jdbcType=INTEGER}
+  </update>
+  <update id="updateByPrimaryKey" parameterType="com.core.manycloudcommon.entity.NodeInfo" >
+    update t_node_info
+    set label = #{label,jdbcType=VARCHAR},
+      node_val = #{nodeVal,jdbcType=VARCHAR},
+      node_param = #{nodeParam,jdbcType=VARCHAR},
+      continent_id = #{continentId,jdbcType=INTEGER},
+      country_id = #{countryId,jdbcType=INTEGER},
+      province_id = #{provinceId,jdbcType=INTEGER},
+      city_id = #{cityId,jdbcType=INTEGER},
+      node_name = #{nodeName,jdbcType=VARCHAR},
+      sorting = #{sorting,jdbcType=INTEGER},
+      remark = #{remark,jdbcType=VARCHAR},
+      status = #{status,jdbcType=INTEGER},
+      create_time = #{createTime,jdbcType=TIMESTAMP},
+      update_time = #{updateTime,jdbcType=TIMESTAMP}
+    where id = #{id,jdbcType=INTEGER}
+  </update>
+
+  <select id="selectBaseProduct" resultType="com.core.manycloudcommon.vo.main.BaseProductVO">
+    select
+        rcon.continent_name as continent,
+        rcon.id as continentId,
+        rc.country_name as country,
+        rc.id as countryId,
+        rp.province_name as province,
+        rp.id as provinceId,
+        rci.city_name as city,
+        rci.id as cityId,
+        count(1)as nodeNum
+    from
+        t_node_info as n
+    left join
+        t_region_continent as rcon on rcon.id = n.continent_id
+    left join
+        t_region_country as rc on rc.id = n.country_id
+    left join
+        t_region_province as rp on rp.id = n.province_id
+    left join
+        t_region_city as rci on rci.id = n.city_id
+    where
+      n.status = 0
+    <if test="continentId != null" >
+      and n.continent_id = #{continentId,jdbcType=INTEGER}
+    </if>
+    <if test="countryId != null" >
+      and n.country_id = #{countryId,jdbcType=INTEGER}
+    </if>
+    <if test="screen != null" >
+      and (rp.province_name like '%${screen}%' or rci.city_name like '%${screen}%' or rc.country_name like '%${screen}%')
+    </if>
+    <if test="list != null" >
+      and n.id in
+      <foreach item="item" collection="list" separator="," open="(" close=")">
+        #{item,jdbcType=INTEGER}
+      </foreach>
+    </if>
+    group by n.city_id
+    order by rc.sorting
+  </select>
+
+  <select id="queryNodeMinPrice" resultType="java.math.BigDecimal" parameterType="java.lang.Integer">
+    SELECT
+      min(IFNULL(t.modelPrice,0.0) + IFNULL(t.diskPrice,0.0) + IFNULL(t.networkPrice,0.0))as minPrice
+    FROM(
+        select
+            n.node_name,
+            min(case when np.config_type = 'model' and (np.period = 1 or np.period = 2) then np.price end)as modelPrice,
+            min(case when np.config_type = 'disk' and (np.period = 1 or np.period = 2) then (np.price / np.item) * (nd.min_num - nd.give_num) end)as diskPrice,
+            min(case when np.config_type = 'network' and (np.period = 1 or np.period = 2) then np.price * nn.min_num end)as networkPrice
+        from
+            t_node_info as n
+        left join
+            t_node_price as np on np.node_id = n.id
+        left join
+            t_node_disk as nd on nd.id = np.config_id
+        left join
+            t_node_network as nn on nn.id = np.config_id
+        where
+        <if test="type == 1" >
+            n.continent_id = #{regionId,jdbcType=INTEGER}
+        </if>
+        <if test="type == 2" >
+            n.country_id = #{regionId,jdbcType=INTEGER}
+        </if>
+        <if test="type == 3" >
+            n.province_id = #{regionId,jdbcType=INTEGER}
+        </if>
+        <if test="type == 4" >
+            n.city_id = #{regionId,jdbcType=INTEGER}
+        </if>
+        <if test="type == 5" >
+            n.id = #{regionId,jdbcType=INTEGER}
+        </if>
+        <if test="list != null" >
+          and n.id in
+          <foreach item="item" collection="list" separator="," open="(" close=")">
+            #{item,jdbcType=INTEGER}
+          </foreach>
+        </if>
+        group by n.id) as t
+  </select>
+
+  <select id="queryNodeProductNum" resultType="java.lang.Integer" parameterType="java.lang.Integer">
+    select
+    IFNULL(count(1),0)as productNum
+    from
+    t_node_info as n
+    left join
+    t_node_model as nm on nm.node_id = n.id
+    where
+    <if test="type == 1" >
+      n.continent_id = #{regionId,jdbcType=INTEGER}
+    </if>
+    <if test="type == 2" >
+      n.country_id = #{regionId,jdbcType=INTEGER}
+    </if>
+    <if test="type == 3" >
+      n.province_id = #{regionId,jdbcType=INTEGER}
+    </if>
+    <if test="type == 4" >
+      n.city_id = #{regionId,jdbcType=INTEGER}
+    </if>
+    <if test="list != null" >
+      and n.id in
+      <foreach item="item" collection="list" separator="," open="(" close=")">
+        #{item,jdbcType=INTEGER}
+      </foreach>
+    </if>
+  </select>
+
+  <select id="selectByRegionId" resultMap="BaseResultMap" parameterType="java.lang.Integer">
+    select
+    <include refid="Base_Column_List" />
+    from
+    t_node_info
+    where
+      status = 0
+    <if test="regionType == 1" >
+      and continent_id = #{regionId,jdbcType=INTEGER}
+    </if>
+    <if test="regionType == 2" >
+      and country_id = #{regionId,jdbcType=INTEGER}
+    </if>
+    <if test="regionType == 3" >
+      and province_id = #{regionId,jdbcType=INTEGER}
+    </if>
+    <if test="regionType == 4" >
+      and city_id = #{regionId,jdbcType=INTEGER}
+    </if>
+    order by sorting
+  </select>
+
+
+  <select id="selectBdAttByRegionId" resultMap="BaseResultMap">
+    select
+    n.id, n.label, n.node_val, n.node_param, n.continent_id, n.country_id, n.province_id, n.city_id,
+    n.node_name, n.sorting, n.remark, n.status, n.create_time, n.update_time,
+    IFNULL(count(a.id),0)as bd_num
+    from
+    t_node_info as n
+    left join
+    t_node_attribute as a on a.node_id = n.id
+    where
+    n.status = 0
+    <if test="regionType == 1" >
+      and n.continent_id = #{regionId,jdbcType=INTEGER}
+    </if>
+    <if test="regionType == 2" >
+      and n.country_id = #{regionId,jdbcType=INTEGER}
+    </if>
+    <if test="regionType == 3" >
+      and n.province_id = #{regionId,jdbcType=INTEGER}
+    </if>
+    <if test="regionType == 4" >
+      and n.city_id = #{regionId,jdbcType=INTEGER}
+    </if>
+    <if test="list != null" >
+      and a.attribute_id in
+      <foreach item="item" collection="list" separator="," open="(" close=")">
+        #{item,jdbcType=INTEGER}
+      </foreach>
+    </if>
+    group by n.id
+    order by n.sorting
+  </select>
+
+
+  <select id="selectList" resultType="com.core.manycloudcommon.vo.node.QueryNodeListVO">
+    select
+        n.id,n.node_name as name,n.label,p.name as platformName,n.node_val as nodeVal,n.node_param as nodeParam,n.sorting,n.remark,n.status,n.update_time as updateTime,
+        IFNULL(count(i.id),0)as instanceNum
+    from
+        t_node_info as n
+    left join
+        t_platform_info as p on p.label = n.label
+    left join
+        t_instance_info as i on i.node_id = n.id and (i.status = 1 or i.status = 2 or i.status = 3 or i.status = 4)
+    where
+      1 = 1
+    <if test="name != null" >
+      and n.node_name like '%${name}%'
+    </if>
+    <if test="continentId != null" >
+      and n.continent_id = #{continentId,jdbcType=INTEGER}
+    </if>
+    <if test="countryId != null" >
+      and n.country_id = #{countryId,jdbcType=INTEGER}
+    </if>
+    <if test="provinceId != null" >
+      and n.province_id = #{provinceId,jdbcType=INTEGER}
+    </if>
+    <if test="cityId != null" >
+      and n.city_id = #{cityId,jdbcType=INTEGER}
+    </if>
+    <if test="status != null" >
+      and n.status = #{status,jdbcType=INTEGER}
+    </if>
+    group by n.id
+    order by n.id desc
+  </select>
+
+
+
+</mapper>

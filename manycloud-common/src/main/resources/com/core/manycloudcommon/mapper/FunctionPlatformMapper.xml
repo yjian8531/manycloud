@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="com.core.manycloudcommon.mapper.FunctionPlatformMapper" >
+  <resultMap id="BaseResultMap" type="com.core.manycloudcommon.entity.FunctionPlatform" >
+    <id column="id" property="id" jdbcType="INTEGER" />
+    <result column="function_id" property="functionId" jdbcType="INTEGER" />
+    <result column="platform_id" property="platformId" jdbcType="INTEGER" />
+    <result column="create_time" property="createTime" jdbcType="TIMESTAMP" />
+  </resultMap>
+  <sql id="Base_Column_List" >
+    id, function_id, platform_id, create_time
+  </sql>
+  <select id="selectByPrimaryKey" resultMap="BaseResultMap" parameterType="java.lang.Integer" >
+    select 
+    <include refid="Base_Column_List" />
+    from t_function_platform
+    where id = #{id,jdbcType=INTEGER}
+  </select>
+
+  <select id="selectByPlatform" resultMap="BaseResultMap" parameterType="java.lang.Integer" >
+    select
+    <include refid="Base_Column_List" />
+    from t_function_platform
+    where platform_id = #{platformId,jdbcType=INTEGER}
+  </select>
+
+  <delete id="deleteByPrimaryKey" parameterType="java.lang.Integer" >
+    delete from t_function_platform
+    where id = #{id,jdbcType=INTEGER}
+  </delete>
+
+  <delete id="deleteByIds" parameterType="java.util.List" >
+    delete from t_function_platform
+    where id in
+    <foreach item="item" collection="list" separator="," open="(" close=")">
+      #{item,jdbcType=INTEGER}
+    </foreach>
+  </delete>
+
+
+  <insert id="insert" parameterType="com.core.manycloudcommon.entity.FunctionPlatform" >
+    <selectKey resultType="java.lang.Integer" keyProperty="id" order="AFTER" >
+      SELECT LAST_INSERT_ID()
+    </selectKey>
+    insert into t_function_platform (function_id, platform_id, create_time
+      )
+    values (#{functionId,jdbcType=INTEGER}, #{platformId,jdbcType=INTEGER}, #{createTime,jdbcType=TIMESTAMP})
+  </insert>
+
+
+  <insert id="insertList" parameterType="java.util.List" >
+    <selectKey resultType="java.lang.Integer" keyProperty="id" order="AFTER" >
+      SELECT LAST_INSERT_ID()
+    </selectKey>
+    insert into t_function_platform (function_id, platform_id, create_time
+    )
+    value
+    <foreach item="item" collection="list" separator=",">
+      (#{item.functionId,jdbcType=INTEGER}, #{item.platformId,jdbcType=INTEGER}, #{item.createTime,jdbcType=TIMESTAMP})
+    </foreach>
+  </insert>
+
+  <insert id="insertSelective" parameterType="com.core.manycloudcommon.entity.FunctionPlatform" >
+    <selectKey resultType="java.lang.Integer" keyProperty="id" order="AFTER" >
+      SELECT LAST_INSERT_ID()
+    </selectKey>
+    insert into t_function_platform
+    <trim prefix="(" suffix=")" suffixOverrides="," >
+      <if test="functionId != null" >
+        function_id,
+      </if>
+      <if test="platformId != null" >
+        platform_id,
+      </if>
+      <if test="createTime != null" >
+        create_time,
+      </if>
+    </trim>
+    <trim prefix="values (" suffix=")" suffixOverrides="," >
+      <if test="functionId != null" >
+        #{functionId,jdbcType=INTEGER},
+      </if>
+      <if test="platformId != null" >
+        #{platformId,jdbcType=INTEGER},
+      </if>
+      <if test="createTime != null" >
+        #{createTime,jdbcType=TIMESTAMP},
+      </if>
+    </trim>
+  </insert>
+  <update id="updateByPrimaryKeySelective" parameterType="com.core.manycloudcommon.entity.FunctionPlatform" >
+    update t_function_platform
+    <set >
+      <if test="functionId != null" >
+        function_id = #{functionId,jdbcType=INTEGER},
+      </if>
+      <if test="platformId != null" >
+        platform_id = #{platformId,jdbcType=INTEGER},
+      </if>
+      <if test="createTime != null" >
+        create_time = #{createTime,jdbcType=TIMESTAMP},
+      </if>
+    </set>
+    where id = #{id,jdbcType=INTEGER}
+  </update>
+  <update id="updateByPrimaryKey" parameterType="com.core.manycloudcommon.entity.FunctionPlatform" >
+    update t_function_platform
+    set function_id = #{functionId,jdbcType=INTEGER},
+      platform_id = #{platformId,jdbcType=INTEGER},
+      create_time = #{createTime,jdbcType=TIMESTAMP}
+    where id = #{id,jdbcType=INTEGER}
+  </update>
+</mapper>

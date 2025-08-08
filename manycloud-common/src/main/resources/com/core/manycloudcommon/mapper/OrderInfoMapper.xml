@@ -1,0 +1,380 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="com.core.manycloudcommon.mapper.OrderInfoMapper" >
+  <resultMap id="BaseResultMap" type="com.core.manycloudcommon.entity.OrderInfo" >
+    <id column="id" property="id" jdbcType="INTEGER" />
+    <result column="order_no" property="orderNo" jdbcType="VARCHAR" />
+    <result column="user_id" property="userId" jdbcType="VARCHAR" />
+    <result column="num" property="num" jdbcType="INTEGER" />
+    <result column="period" property="period" jdbcType="INTEGER" />
+    <result column="duration" property="duration" jdbcType="INTEGER" />
+    <result column="price" property="price" jdbcType="DECIMAL" />
+    <result column="only_price" property="onlyPrice" jdbcType="DECIMAL" />
+    <result column="discount" property="discount" jdbcType="DECIMAL" />
+    <result column="type" property="type" jdbcType="INTEGER" />
+    <result column="label" property="label" jdbcType="VARCHAR" />
+    <result column="account_id" property="accountId" jdbcType="INTEGER" />
+    <result column="node_id" property="nodeId" jdbcType="INTEGER" />
+    <result column="model_id" property="modelId" jdbcType="INTEGER" />
+    <result column="cpu" property="cpu" jdbcType="VARCHAR" />
+    <result column="ram" property="ram" jdbcType="VARCHAR" />
+    <result column="sys_disk" property="sysDisk" jdbcType="DECIMAL" />
+    <result column="data_disk" property="dataDisk" jdbcType="DECIMAL" />
+    <result column="bandwidth" property="bandwidth" jdbcType="DECIMAL" />
+    <result column="flow" property="flow" jdbcType="DECIMAL" />
+    <result column="image" property="image" jdbcType="VARCHAR" />
+    <result column="image_id" property="imageId" jdbcType="INTEGER" />
+    <result column="status" property="status" jdbcType="INTEGER" />
+    <result column="remark" property="remark" jdbcType="VARCHAR" />
+    <result column="create_time" property="createTime" jdbcType="TIMESTAMP" />
+    <result column="update_time" property="updateTime" jdbcType="TIMESTAMP" />
+  </resultMap>
+  <sql id="Base_Column_List" >
+    id, order_no, user_id, num, period, duration, price,only_price, discount, type, label,
+    account_id, node_id, model_id, cpu, ram, sys_disk, data_disk, bandwidth, flow, image, 
+    image_id, status, remark, create_time, update_time
+  </sql>
+  <select id="selectByPrimaryKey" resultMap="BaseResultMap" parameterType="java.lang.Integer" >
+    select 
+    <include refid="Base_Column_List" />
+    from t_order_info
+    where id = #{id,jdbcType=INTEGER}
+  </select>
+
+  <select id="selectByNo" resultMap="BaseResultMap" parameterType="java.lang.String" >
+    select
+    <include refid="Base_Column_List" />
+    from t_order_info
+    where order_no = #{orderNo,jdbcType=VARCHAR}
+  </select>
+
+  <delete id="deleteByPrimaryKey" parameterType="java.lang.Integer" >
+    delete from t_order_info
+    where id = #{id,jdbcType=INTEGER}
+  </delete>
+
+  <delete id="deleteBatch" parameterType="java.util.List" >
+    delete from t_order_info
+    where id in
+    <foreach item="item" collection="list" separator="," open="(" close=")">
+      #{item,jdbcType=INTEGER}
+    </foreach>
+  </delete>
+
+  <insert id="insert" parameterType="com.core.manycloudcommon.entity.OrderInfo" >
+    <selectKey resultType="java.lang.Integer" keyProperty="id" order="AFTER" >
+      SELECT LAST_INSERT_ID()
+    </selectKey>
+    insert into t_order_info (order_no, user_id, num, 
+      period, duration, price,only_price,
+      discount, type, label,
+      account_id, node_id, model_id, 
+      cpu, ram, sys_disk, 
+      data_disk, bandwidth, flow, 
+      image, image_id, status, 
+      remark, create_time, update_time
+      )
+    values (#{orderNo,jdbcType=VARCHAR}, #{userId,jdbcType=VARCHAR}, #{num,jdbcType=INTEGER}, 
+      #{period,jdbcType=INTEGER}, #{duration,jdbcType=INTEGER}, #{price,jdbcType=DECIMAL},#{onlyPrice,jdbcType=DECIMAL},
+      #{discount,jdbcType=DECIMAL}, #{type,jdbcType=INTEGER}, #{label,jdbcType=VARCHAR},
+      #{accountId,jdbcType=INTEGER}, #{nodeId,jdbcType=INTEGER}, #{modelId,jdbcType=INTEGER}, 
+      #{cpu,jdbcType=VARCHAR}, #{ram,jdbcType=VARCHAR}, #{sysDisk,jdbcType=DECIMAL}, 
+      #{dataDisk,jdbcType=DECIMAL}, #{bandwidth,jdbcType=DECIMAL}, #{flow,jdbcType=DECIMAL}, 
+      #{image,jdbcType=VARCHAR}, #{imageId,jdbcType=INTEGER}, #{status,jdbcType=INTEGER}, 
+      #{remark,jdbcType=VARCHAR}, #{createTime,jdbcType=TIMESTAMP}, #{updateTime,jdbcType=TIMESTAMP}
+      )
+  </insert>
+  <insert id="insertSelective" parameterType="com.core.manycloudcommon.entity.OrderInfo" >
+    <selectKey resultType="java.lang.Integer" keyProperty="id" order="AFTER" >
+      SELECT LAST_INSERT_ID()
+    </selectKey>
+    insert into t_order_info
+    <trim prefix="(" suffix=")" suffixOverrides="," >
+      <if test="orderNo != null" >
+        order_no,
+      </if>
+      <if test="userId != null" >
+        user_id,
+      </if>
+      <if test="num != null" >
+        num,
+      </if>
+      <if test="period != null" >
+        period,
+      </if>
+      <if test="duration != null" >
+        duration,
+      </if>
+      <if test="price != null" >
+        price,
+      </if>
+      <if test="onlyPrice != null" >
+        only_price,
+      </if>
+      <if test="discount != null" >
+        discount,
+      </if>
+      <if test="type != null" >
+        type,
+      </if>
+      <if test="label != null" >
+        label,
+      </if>
+      <if test="accountId != null" >
+        account_id,
+      </if>
+      <if test="nodeId != null" >
+        node_id,
+      </if>
+      <if test="modelId != null" >
+        model_id,
+      </if>
+      <if test="cpu != null" >
+        cpu,
+      </if>
+      <if test="ram != null" >
+        ram,
+      </if>
+      <if test="sysDisk != null" >
+        sys_disk,
+      </if>
+      <if test="dataDisk != null" >
+        data_disk,
+      </if>
+      <if test="bandwidth != null" >
+        bandwidth,
+      </if>
+      <if test="flow != null" >
+        flow,
+      </if>
+      <if test="image != null" >
+        image,
+      </if>
+      <if test="imageId != null" >
+        image_id,
+      </if>
+      <if test="status != null" >
+        status,
+      </if>
+      <if test="remark != null" >
+        remark,
+      </if>
+      <if test="createTime != null" >
+        create_time,
+      </if>
+      <if test="updateTime != null" >
+        update_time,
+      </if>
+    </trim>
+    <trim prefix="values (" suffix=")" suffixOverrides="," >
+      <if test="orderNo != null" >
+        #{orderNo,jdbcType=VARCHAR},
+      </if>
+      <if test="userId != null" >
+        #{userId,jdbcType=VARCHAR},
+      </if>
+      <if test="num != null" >
+        #{num,jdbcType=INTEGER},
+      </if>
+      <if test="period != null" >
+        #{period,jdbcType=INTEGER},
+      </if>
+      <if test="duration != null" >
+        #{duration,jdbcType=INTEGER},
+      </if>
+      <if test="price != null" >
+        #{price,jdbcType=DECIMAL},
+      </if>
+      <if test="onlyPrice != null" >
+        #{onlyPrice,jdbcType=DECIMAL},
+      </if>
+      <if test="discount != null" >
+        #{discount,jdbcType=DECIMAL},
+      </if>
+      <if test="type != null" >
+        #{type,jdbcType=INTEGER},
+      </if>
+      <if test="label != null" >
+        #{label,jdbcType=VARCHAR},
+      </if>
+      <if test="accountId != null" >
+        #{accountId,jdbcType=INTEGER},
+      </if>
+      <if test="nodeId != null" >
+        #{nodeId,jdbcType=INTEGER},
+      </if>
+      <if test="modelId != null" >
+        #{modelId,jdbcType=INTEGER},
+      </if>
+      <if test="cpu != null" >
+        #{cpu,jdbcType=VARCHAR},
+      </if>
+      <if test="ram != null" >
+        #{ram,jdbcType=VARCHAR},
+      </if>
+      <if test="sysDisk != null" >
+        #{sysDisk,jdbcType=DECIMAL},
+      </if>
+      <if test="dataDisk != null" >
+        #{dataDisk,jdbcType=DECIMAL},
+      </if>
+      <if test="bandwidth != null" >
+        #{bandwidth,jdbcType=DECIMAL},
+      </if>
+      <if test="flow != null" >
+        #{flow,jdbcType=DECIMAL},
+      </if>
+      <if test="image != null" >
+        #{image,jdbcType=VARCHAR},
+      </if>
+      <if test="imageId != null" >
+        #{imageId,jdbcType=INTEGER},
+      </if>
+      <if test="status != null" >
+        #{status,jdbcType=INTEGER},
+      </if>
+      <if test="remark != null" >
+        #{remark,jdbcType=VARCHAR},
+      </if>
+      <if test="createTime != null" >
+        #{createTime,jdbcType=TIMESTAMP},
+      </if>
+      <if test="updateTime != null" >
+        #{updateTime,jdbcType=TIMESTAMP},
+      </if>
+    </trim>
+  </insert>
+  <update id="updateByPrimaryKeySelective" parameterType="com.core.manycloudcommon.entity.OrderInfo" >
+    update t_order_info
+    <set >
+      <if test="orderNo != null" >
+        order_no = #{orderNo,jdbcType=VARCHAR},
+      </if>
+      <if test="userId != null" >
+        user_id = #{userId,jdbcType=VARCHAR},
+      </if>
+      <if test="num != null" >
+        num = #{num,jdbcType=INTEGER},
+      </if>
+      <if test="period != null" >
+        period = #{period,jdbcType=INTEGER},
+      </if>
+      <if test="duration != null" >
+        duration = #{duration,jdbcType=INTEGER},
+      </if>
+      <if test="price != null" >
+        price = #{price,jdbcType=DECIMAL},
+      </if>
+      <if test="onlyPrice != null" >
+        only_price = #{onlyPrice,jdbcType=DECIMAL},
+      </if>
+      <if test="discount != null" >
+        discount = #{discount,jdbcType=DECIMAL},
+      </if>
+      <if test="type != null" >
+        type = #{type,jdbcType=INTEGER},
+      </if>
+      <if test="label != null" >
+        label = #{label,jdbcType=VARCHAR},
+      </if>
+      <if test="accountId != null" >
+        account_id = #{accountId,jdbcType=INTEGER},
+      </if>
+      <if test="nodeId != null" >
+        node_id = #{nodeId,jdbcType=INTEGER},
+      </if>
+      <if test="modelId != null" >
+        model_id = #{modelId,jdbcType=INTEGER},
+      </if>
+      <if test="cpu != null" >
+        cpu = #{cpu,jdbcType=VARCHAR},
+      </if>
+      <if test="ram != null" >
+        ram = #{ram,jdbcType=VARCHAR},
+      </if>
+      <if test="sysDisk != null" >
+        sys_disk = #{sysDisk,jdbcType=DECIMAL},
+      </if>
+      <if test="dataDisk != null" >
+        data_disk = #{dataDisk,jdbcType=DECIMAL},
+      </if>
+      <if test="bandwidth != null" >
+        bandwidth = #{bandwidth,jdbcType=DECIMAL},
+      </if>
+      <if test="flow != null" >
+        flow = #{flow,jdbcType=DECIMAL},
+      </if>
+      <if test="image != null" >
+        image = #{image,jdbcType=VARCHAR},
+      </if>
+      <if test="imageId != null" >
+        image_id = #{imageId,jdbcType=INTEGER},
+      </if>
+      <if test="status != null" >
+        status = #{status,jdbcType=INTEGER},
+      </if>
+      <if test="remark != null" >
+        remark = #{remark,jdbcType=VARCHAR},
+      </if>
+      <if test="createTime != null" >
+        create_time = #{createTime,jdbcType=TIMESTAMP},
+      </if>
+      <if test="updateTime != null" >
+        update_time = #{updateTime,jdbcType=TIMESTAMP},
+      </if>
+    </set>
+    where id = #{id,jdbcType=INTEGER}
+  </update>
+  <update id="updateByPrimaryKey" parameterType="com.core.manycloudcommon.entity.OrderInfo" >
+    update t_order_info
+    set order_no = #{orderNo,jdbcType=VARCHAR},
+      user_id = #{userId,jdbcType=VARCHAR},
+      num = #{num,jdbcType=INTEGER},
+      period = #{period,jdbcType=INTEGER},
+      duration = #{duration,jdbcType=INTEGER},
+      price = #{price,jdbcType=DECIMAL},
+      only_price = #{onlyPrice,jdbcType=DECIMAL},
+      discount = #{discount,jdbcType=DECIMAL},
+      type = #{type,jdbcType=INTEGER},
+      label = #{label,jdbcType=VARCHAR},
+      account_id = #{accountId,jdbcType=INTEGER},
+      node_id = #{nodeId,jdbcType=INTEGER},
+      model_id = #{modelId,jdbcType=INTEGER},
+      cpu = #{cpu,jdbcType=VARCHAR},
+      ram = #{ram,jdbcType=VARCHAR},
+      sys_disk = #{sysDisk,jdbcType=DECIMAL},
+      data_disk = #{dataDisk,jdbcType=DECIMAL},
+      bandwidth = #{bandwidth,jdbcType=DECIMAL},
+      flow = #{flow,jdbcType=DECIMAL},
+      image = #{image,jdbcType=VARCHAR},
+      image_id = #{imageId,jdbcType=INTEGER},
+      status = #{status,jdbcType=INTEGER},
+      remark = #{remark,jdbcType=VARCHAR},
+      create_time = #{createTime,jdbcType=TIMESTAMP},
+      update_time = #{updateTime,jdbcType=TIMESTAMP}
+    where id = #{id,jdbcType=INTEGER}
+  </update>
+
+  <select id="selectShoppingList" resultType="com.core.manycloudcommon.vo.order.ShoppingListVO">
+    select
+      o.order_no as orderNo,
+      o.id,
+      '购买云主机' as name,
+      CONCAT(n.node_name, ' ', o.cpu,'核',o.ram,'G')as config,
+      o.num,
+      o.price,
+      o.status,
+      case when o.period = 0 then '天' else '月' end as period,
+      o.duration
+    from
+      t_order_info as o
+    left join
+      t_node_info as n on n.id = o.node_id
+    where
+      (o.status = 0 or o.status = 1)
+    and
+      o.user_id = #{userId,jdbcType=VARCHAR}
+
+    order by o.id desc
+  </select>
+</mapper>

@@ -1,0 +1,223 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="com.core.manycloudcommon.mapper.NodePriceMapper" >
+  <resultMap id="BaseResultMap" type="com.core.manycloudcommon.entity.NodePrice" >
+    <id column="id" property="id" jdbcType="INTEGER" />
+    <result column="node_id" property="nodeId" jdbcType="INTEGER" />
+    <result column="config_type" property="configType" jdbcType="VARCHAR" />
+    <result column="config_id" property="configId" jdbcType="INTEGER" />
+    <result column="period" property="period" jdbcType="INTEGER" />
+    <result column="item" property="item" jdbcType="DECIMAL" />
+    <result column="price" property="price" jdbcType="DECIMAL" />
+    <result column="remark" property="remark" jdbcType="VARCHAR" />
+    <result column="status" property="status" jdbcType="INTEGER" />
+    <result column="create_time" property="createTime" jdbcType="TIMESTAMP" />
+    <result column="update_time" property="updateTime" jdbcType="TIMESTAMP" />
+    <result column="config_name" property="configName" jdbcType="VARCHAR" />
+  </resultMap>
+  <sql id="Base_Column_List" >
+    id, node_id, config_type, config_id, period, item, price, remark, status, create_time, 
+    update_time
+  </sql>
+  <select id="selectByPrimaryKey" resultMap="BaseResultMap" parameterType="java.lang.Integer" >
+    select
+    <include refid="Base_Column_List" />
+    from t_node_price
+    where id = #{id,jdbcType=INTEGER}
+  </select>
+
+
+  <select id="selectList" resultMap="BaseResultMap">
+    select
+        np.id,
+            np.node_id,
+            np.config_type,
+            np.config_id,
+            np.period,
+            np.item,
+            np.price,
+            np.remark,
+            np.status,
+            np.create_time,
+            np.update_time,
+            case when np.config_type = 'model' then CONCAT(nm.cpu_val,'C', nm.ram_val,'G')
+                     when np.config_type = 'disk' then nd.disk_type
+                     when np.config_type = 'network' then nn.network_type
+                     else '' end as config_name
+    from
+        t_node_price as np
+    left join
+        t_node_disk as nd on nd.id = np.config_id
+    left join
+        t_node_network as nn on nn.id = np.config_id
+    left join
+        t_node_model as nm on nm.id = np.config_id
+    where
+      1 = 1
+    <if test="nodeId != null" >
+      and np.node_id = #{nodeId,jdbcType=INTEGER}
+    </if>
+    <if test="configType != null" >
+      and np.config_type = #{configType,jdbcType=VARCHAR}
+    </if>
+    <if test="status != null" >
+      and np.status = #{status,jdbcType=INTEGER}
+    </if>
+    group by np.id
+    order by np.id desc
+  </select>
+
+  <select id="selectConfigPrice" resultMap="BaseResultMap">
+    select
+    <include refid="Base_Column_List" />
+    from t_node_price
+    where
+      status = 0
+    and
+      node_id = #{nodeId,jdbcType=INTEGER}
+    and
+      config_type = #{configType,jdbcType=VARCHAR}
+    and
+      config_id = #{configId,jdbcType=INTEGER}
+    and
+      period = #{period,jdbcType=INTEGER}
+  </select>
+
+  <delete id="deleteByPrimaryKey" parameterType="java.lang.Integer" >
+    delete from t_node_price
+    where id = #{id,jdbcType=INTEGER}
+  </delete>
+  <insert id="insert" parameterType="com.core.manycloudcommon.entity.NodePrice" >
+    <selectKey resultType="java.lang.Integer" keyProperty="id" order="AFTER" >
+      SELECT LAST_INSERT_ID()
+    </selectKey>
+    insert into t_node_price (node_id, config_type, config_id, 
+      period, item, price, 
+      remark, status, create_time, 
+      update_time)
+    values (#{nodeId,jdbcType=INTEGER}, #{configType,jdbcType=VARCHAR}, #{configId,jdbcType=INTEGER}, 
+      #{period,jdbcType=INTEGER}, #{item,jdbcType=DECIMAL}, #{price,jdbcType=DECIMAL}, 
+      #{remark,jdbcType=VARCHAR}, #{status,jdbcType=INTEGER}, #{createTime,jdbcType=TIMESTAMP}, 
+      #{updateTime,jdbcType=TIMESTAMP})
+  </insert>
+  <insert id="insertSelective" parameterType="com.core.manycloudcommon.entity.NodePrice" >
+    <selectKey resultType="java.lang.Integer" keyProperty="id" order="AFTER" >
+      SELECT LAST_INSERT_ID()
+    </selectKey>
+    insert into t_node_price
+    <trim prefix="(" suffix=")" suffixOverrides="," >
+      <if test="nodeId != null" >
+        node_id,
+      </if>
+      <if test="configType != null" >
+        config_type,
+      </if>
+      <if test="configId != null" >
+        config_id,
+      </if>
+      <if test="period != null" >
+        period,
+      </if>
+      <if test="item != null" >
+        item,
+      </if>
+      <if test="price != null" >
+        price,
+      </if>
+      <if test="remark != null" >
+        remark,
+      </if>
+      <if test="status != null" >
+        status,
+      </if>
+      <if test="createTime != null" >
+        create_time,
+      </if>
+      <if test="updateTime != null" >
+        update_time,
+      </if>
+    </trim>
+    <trim prefix="values (" suffix=")" suffixOverrides="," >
+      <if test="nodeId != null" >
+        #{nodeId,jdbcType=INTEGER},
+      </if>
+      <if test="configType != null" >
+        #{configType,jdbcType=VARCHAR},
+      </if>
+      <if test="configId != null" >
+        #{configId,jdbcType=INTEGER},
+      </if>
+      <if test="period != null" >
+        #{period,jdbcType=INTEGER},
+      </if>
+      <if test="item != null" >
+        #{item,jdbcType=DECIMAL},
+      </if>
+      <if test="price != null" >
+        #{price,jdbcType=DECIMAL},
+      </if>
+      <if test="remark != null" >
+        #{remark,jdbcType=VARCHAR},
+      </if>
+      <if test="status != null" >
+        #{status,jdbcType=INTEGER},
+      </if>
+      <if test="createTime != null" >
+        #{createTime,jdbcType=TIMESTAMP},
+      </if>
+      <if test="updateTime != null" >
+        #{updateTime,jdbcType=TIMESTAMP},
+      </if>
+    </trim>
+  </insert>
+  <update id="updateByPrimaryKeySelective" parameterType="com.core.manycloudcommon.entity.NodePrice" >
+    update t_node_price
+    <set >
+      <if test="nodeId != null" >
+        node_id = #{nodeId,jdbcType=INTEGER},
+      </if>
+      <if test="configType != null" >
+        config_type = #{configType,jdbcType=VARCHAR},
+      </if>
+      <if test="configId != null" >
+        config_id = #{configId,jdbcType=INTEGER},
+      </if>
+      <if test="period != null" >
+        period = #{period,jdbcType=INTEGER},
+      </if>
+      <if test="item != null" >
+        item = #{item,jdbcType=DECIMAL},
+      </if>
+      <if test="price != null" >
+        price = #{price,jdbcType=DECIMAL},
+      </if>
+      <if test="remark != null" >
+        remark = #{remark,jdbcType=VARCHAR},
+      </if>
+      <if test="status != null" >
+        status = #{status,jdbcType=INTEGER},
+      </if>
+      <if test="createTime != null" >
+        create_time = #{createTime,jdbcType=TIMESTAMP},
+      </if>
+      <if test="updateTime != null" >
+        update_time = #{updateTime,jdbcType=TIMESTAMP},
+      </if>
+    </set>
+    where id = #{id,jdbcType=INTEGER}
+  </update>
+  <update id="updateByPrimaryKey" parameterType="com.core.manycloudcommon.entity.NodePrice" >
+    update t_node_price
+    set node_id = #{nodeId,jdbcType=INTEGER},
+      config_type = #{configType,jdbcType=VARCHAR},
+      config_id = #{configId,jdbcType=INTEGER},
+      period = #{period,jdbcType=INTEGER},
+      item = #{item,jdbcType=DECIMAL},
+      price = #{price,jdbcType=DECIMAL},
+      remark = #{remark,jdbcType=VARCHAR},
+      status = #{status,jdbcType=INTEGER},
+      create_time = #{createTime,jdbcType=TIMESTAMP},
+      update_time = #{updateTime,jdbcType=TIMESTAMP}
+    where id = #{id,jdbcType=INTEGER}
+  </update>
+</mapper>

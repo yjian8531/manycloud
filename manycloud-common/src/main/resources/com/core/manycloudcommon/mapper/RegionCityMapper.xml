@@ -1,0 +1,202 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="com.core.manycloudcommon.mapper.RegionCityMapper" >
+  <resultMap id="BaseResultMap" type="com.core.manycloudcommon.entity.RegionCity" >
+    <id column="id" property="id" jdbcType="INTEGER" />
+    <result column="superior_id" property="superiorId" jdbcType="INTEGER" />
+    <result column="superior_level" property="superiorLevel" jdbcType="INTEGER" />
+    <result column="superiorName" property="superiorName" jdbcType="VARCHAR" />
+    <result column="city_name" property="cityName" jdbcType="VARCHAR" />
+    <result column="sorting" property="sorting" jdbcType="INTEGER" />
+    <result column="remark" property="remark" jdbcType="VARCHAR" />
+    <result column="status" property="status" jdbcType="INTEGER" />
+    <result column="create_time" property="createTime" jdbcType="TIMESTAMP" />
+    <result column="update_time" property="updateTime" jdbcType="TIMESTAMP" />
+  </resultMap>
+  <sql id="Base_Column_List" >
+    id, superior_id, superior_level, city_name, sorting, remark, status, create_time, 
+    update_time
+  </sql>
+  <select id="selectByPrimaryKey" resultMap="BaseResultMap" parameterType="java.lang.Integer" >
+    select 
+    <include refid="Base_Column_List" />
+    from t_region_city
+    where id = #{id,jdbcType=INTEGER}
+  </select>
+
+  <select id="selectByName" resultMap="BaseResultMap" parameterType="java.lang.String" >
+    select
+    <include refid="Base_Column_List" />
+    from t_region_city
+    where city_name = #{name,jdbcType=VARCHAR}
+  </select>
+
+  <select id="selectAll" resultMap="BaseResultMap">
+    select
+    <include refid="Base_Column_List" />
+    from t_region_city
+    order by id desc
+  </select>
+
+  <select id="selectByProvince" resultMap="BaseResultMap" parameterType="java.lang.Integer" >
+    select
+    <include refid="Base_Column_List" />
+    from t_region_city
+    where superior_id = #{provinceId,jdbcType=INTEGER} and superior_level = 3
+    order by sorting
+  </select>
+
+  <select id="selectBySuperior" resultMap="BaseResultMap" parameterType="java.lang.Integer" >
+    select
+    <include refid="Base_Column_List" />
+    from t_region_city
+    where superior_id = #{id,jdbcType=INTEGER} and superior_level = #{type,jdbcType=INTEGER}
+    order by sorting
+  </select>
+
+  <select id="selectList" resultMap="BaseResultMap">
+    select
+      c.id, c.superior_id, c.superior_level, c.city_name, c.sorting, c.remark, c.status, c.create_time, c.update_time,
+      case when c.superior_level = 1 then con.continent_name when c.superior_level = 2 then cou.country_name else p.province_name end as superiorName
+    from
+      t_region_city as c
+    left join
+      t_region_province as p on p.id = c.superior_id
+    left join
+      t_region_country as cou on cou.id = c.superior_id
+    left join
+      t_region_continent as con on con.id = c.superior_id
+    where
+      1 = 1
+    <if test="superiorId != null" >
+      and c.superior_id = #{superiorId,jdbcType=INTEGER}
+    </if>
+    <if test="superiorLevel != null" >
+      and c.superior_level = #{superiorLevel,jdbcType=INTEGER}
+    </if>
+    <if test="cityName != null" >
+      and c.city_name like '%${cityName}%'
+    </if>
+    <if test="status != null" >
+      and c.status = #{status,jdbcType=INTEGER}
+    </if>
+    order by c.id desc
+  </select>
+
+
+  <delete id="deleteByPrimaryKey" parameterType="java.lang.Integer" >
+    delete from t_region_city
+    where id = #{id,jdbcType=INTEGER}
+  </delete>
+  <insert id="insert" parameterType="com.core.manycloudcommon.entity.RegionCity" >
+    <selectKey resultType="java.lang.Integer" keyProperty="id" order="AFTER" >
+      SELECT LAST_INSERT_ID()
+    </selectKey>
+    insert into t_region_city (superior_id, superior_level, city_name, 
+      sorting, remark, status, 
+      create_time, update_time)
+    values (#{superiorId,jdbcType=INTEGER}, #{superiorLevel,jdbcType=INTEGER}, #{cityName,jdbcType=VARCHAR}, 
+      #{sorting,jdbcType=INTEGER}, #{remark,jdbcType=VARCHAR}, #{status,jdbcType=INTEGER}, 
+      #{createTime,jdbcType=TIMESTAMP}, #{updateTime,jdbcType=TIMESTAMP})
+  </insert>
+  <insert id="insertSelective" parameterType="com.core.manycloudcommon.entity.RegionCity" >
+    <selectKey resultType="java.lang.Integer" keyProperty="id" order="AFTER" >
+      SELECT LAST_INSERT_ID()
+    </selectKey>
+    insert into t_region_city
+    <trim prefix="(" suffix=")" suffixOverrides="," >
+      <if test="superiorId != null" >
+        superior_id,
+      </if>
+      <if test="superiorLevel != null" >
+        superior_level,
+      </if>
+      <if test="cityName != null" >
+        city_name,
+      </if>
+      <if test="sorting != null" >
+        sorting,
+      </if>
+      <if test="remark != null" >
+        remark,
+      </if>
+      <if test="status != null" >
+        status,
+      </if>
+      <if test="createTime != null" >
+        create_time,
+      </if>
+      <if test="updateTime != null" >
+        update_time,
+      </if>
+    </trim>
+    <trim prefix="values (" suffix=")" suffixOverrides="," >
+      <if test="superiorId != null" >
+        #{superiorId,jdbcType=INTEGER},
+      </if>
+      <if test="superiorLevel != null" >
+        #{superiorLevel,jdbcType=INTEGER},
+      </if>
+      <if test="cityName != null" >
+        #{cityName,jdbcType=VARCHAR},
+      </if>
+      <if test="sorting != null" >
+        #{sorting,jdbcType=INTEGER},
+      </if>
+      <if test="remark != null" >
+        #{remark,jdbcType=VARCHAR},
+      </if>
+      <if test="status != null" >
+        #{status,jdbcType=INTEGER},
+      </if>
+      <if test="createTime != null" >
+        #{createTime,jdbcType=TIMESTAMP},
+      </if>
+      <if test="updateTime != null" >
+        #{updateTime,jdbcType=TIMESTAMP},
+      </if>
+    </trim>
+  </insert>
+  <update id="updateByPrimaryKeySelective" parameterType="com.core.manycloudcommon.entity.RegionCity" >
+    update t_region_city
+    <set >
+      <if test="superiorId != null" >
+        superior_id = #{superiorId,jdbcType=INTEGER},
+      </if>
+      <if test="superiorLevel != null" >
+        superior_level = #{superiorLevel,jdbcType=INTEGER},
+      </if>
+      <if test="cityName != null" >
+        city_name = #{cityName,jdbcType=VARCHAR},
+      </if>
+      <if test="sorting != null" >
+        sorting = #{sorting,jdbcType=INTEGER},
+      </if>
+      <if test="remark != null" >
+        remark = #{remark,jdbcType=VARCHAR},
+      </if>
+      <if test="status != null" >
+        status = #{status,jdbcType=INTEGER},
+      </if>
+      <if test="createTime != null" >
+        create_time = #{createTime,jdbcType=TIMESTAMP},
+      </if>
+      <if test="updateTime != null" >
+        update_time = #{updateTime,jdbcType=TIMESTAMP},
+      </if>
+    </set>
+    where id = #{id,jdbcType=INTEGER}
+  </update>
+  <update id="updateByPrimaryKey" parameterType="com.core.manycloudcommon.entity.RegionCity" >
+    update t_region_city
+    set superior_id = #{superiorId,jdbcType=INTEGER},
+      superior_level = #{superiorLevel,jdbcType=INTEGER},
+      city_name = #{cityName,jdbcType=VARCHAR},
+      sorting = #{sorting,jdbcType=INTEGER},
+      remark = #{remark,jdbcType=VARCHAR},
+      status = #{status,jdbcType=INTEGER},
+      create_time = #{createTime,jdbcType=TIMESTAMP},
+      update_time = #{updateTime,jdbcType=TIMESTAMP}
+    where id = #{id,jdbcType=INTEGER}
+  </update>
+</mapper>

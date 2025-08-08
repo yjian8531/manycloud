@@ -1,0 +1,170 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="com.core.manycloudcommon.mapper.NodeImageMapper" >
+  <resultMap id="BaseResultMap" type="com.core.manycloudcommon.entity.NodeImage" >
+    <id column="id" property="id" jdbcType="INTEGER" />
+    <result column="node_id" property="nodeId" jdbcType="INTEGER" />
+    <result column="image_type" property="imageType" jdbcType="VARCHAR" />
+    <result column="image_version" property="imageVersion" jdbcType="VARCHAR" />
+    <result column="image_param" property="imageParam" jdbcType="VARCHAR" />
+    <result column="remark_" property="remark" jdbcType="VARCHAR" />
+    <result column="status" property="status" jdbcType="INTEGER" />
+    <result column="create_time" property="createTime" jdbcType="TIMESTAMP" />
+    <result column="update_time" property="updateTime" jdbcType="TIMESTAMP" />
+  </resultMap>
+  <sql id="Base_Column_List" >
+    id, node_id, image_type, image_version, image_param, remark_, status, create_time, 
+    update_time
+  </sql>
+  <select id="selectByPrimaryKey" resultMap="BaseResultMap" parameterType="java.lang.Integer" >
+    select 
+    <include refid="Base_Column_List" />
+    from t_node_image
+    where id = #{id,jdbcType=INTEGER}
+  </select>
+
+  <select id="selectList" resultMap="BaseResultMap">
+    select
+    <include refid="Base_Column_List" />
+    from t_node_image
+    where
+    1 = 1
+    <if test="nodeId != null" >
+      and node_id = #{nodeId,jdbcType=INTEGER}
+    </if>
+    <if test="imageType != null" >
+      and image_type like '%${imageType}%'
+    </if>
+     order by id desc
+  </select>
+
+  <select id="selectByNode" resultMap="BaseResultMap" parameterType="java.lang.Integer" >
+    select
+    <include refid="Base_Column_List" />
+    from t_node_image
+    where node_id = #{nodeId,jdbcType=INTEGER} and status = 0
+  </select>
+
+  <select id="selectNodeParam" resultMap="BaseResultMap">
+    select
+    <include refid="Base_Column_List" />
+    from t_node_image
+    where node_id = #{nodeId,jdbcType=INTEGER} and image_param = #{imageId,jdbcType=VARCHAR}
+  </select>
+
+  <delete id="deleteByPrimaryKey" parameterType="java.lang.Integer" >
+    delete from t_node_image
+    where id = #{id,jdbcType=INTEGER}
+  </delete>
+  <insert id="insert" parameterType="com.core.manycloudcommon.entity.NodeImage" >
+    <selectKey resultType="java.lang.Integer" keyProperty="id" order="AFTER" >
+      SELECT LAST_INSERT_ID()
+    </selectKey>
+    insert into t_node_image (node_id, image_type, image_version, 
+      image_param, remark_, status, 
+      create_time, update_time)
+    values (#{nodeId,jdbcType=INTEGER}, #{imageType,jdbcType=VARCHAR}, #{imageVersion,jdbcType=VARCHAR}, 
+      #{imageParam,jdbcType=VARCHAR}, #{remark,jdbcType=VARCHAR}, #{status,jdbcType=INTEGER}, 
+      #{createTime,jdbcType=TIMESTAMP}, #{updateTime,jdbcType=TIMESTAMP})
+  </insert>
+  <insert id="insertSelective" parameterType="com.core.manycloudcommon.entity.NodeImage" >
+    <selectKey resultType="java.lang.Integer" keyProperty="id" order="AFTER" >
+      SELECT LAST_INSERT_ID()
+    </selectKey>
+    insert into t_node_image
+    <trim prefix="(" suffix=")" suffixOverrides="," >
+      <if test="nodeId != null" >
+        node_id,
+      </if>
+      <if test="imageType != null" >
+        image_type,
+      </if>
+      <if test="imageVersion != null" >
+        image_version,
+      </if>
+      <if test="imageParam != null" >
+        image_param,
+      </if>
+      <if test="remark != null" >
+        remark_,
+      </if>
+      <if test="status != null" >
+        status,
+      </if>
+      <if test="createTime != null" >
+        create_time,
+      </if>
+      <if test="updateTime != null" >
+        update_time,
+      </if>
+    </trim>
+    <trim prefix="values (" suffix=")" suffixOverrides="," >
+      <if test="nodeId != null" >
+        #{nodeId,jdbcType=INTEGER},
+      </if>
+      <if test="imageType != null" >
+        #{imageType,jdbcType=VARCHAR},
+      </if>
+      <if test="imageVersion != null" >
+        #{imageVersion,jdbcType=VARCHAR},
+      </if>
+      <if test="imageParam != null" >
+        #{imageParam,jdbcType=VARCHAR},
+      </if>
+      <if test="remark != null" >
+        #{remark,jdbcType=VARCHAR},
+      </if>
+      <if test="status != null" >
+        #{status,jdbcType=INTEGER},
+      </if>
+      <if test="createTime != null" >
+        #{createTime,jdbcType=TIMESTAMP},
+      </if>
+      <if test="updateTime != null" >
+        #{updateTime,jdbcType=TIMESTAMP},
+      </if>
+    </trim>
+  </insert>
+  <update id="updateByPrimaryKeySelective" parameterType="com.core.manycloudcommon.entity.NodeImage" >
+    update t_node_image
+    <set >
+      <if test="nodeId != null" >
+        node_id = #{nodeId,jdbcType=INTEGER},
+      </if>
+      <if test="imageType != null" >
+        image_type = #{imageType,jdbcType=VARCHAR},
+      </if>
+      <if test="imageVersion != null" >
+        image_version = #{imageVersion,jdbcType=VARCHAR},
+      </if>
+      <if test="imageParam != null" >
+        image_param = #{imageParam,jdbcType=VARCHAR},
+      </if>
+      <if test="remark != null" >
+        remark_ = #{remark,jdbcType=VARCHAR},
+      </if>
+      <if test="status != null" >
+        status = #{status,jdbcType=INTEGER},
+      </if>
+      <if test="createTime != null" >
+        create_time = #{createTime,jdbcType=TIMESTAMP},
+      </if>
+      <if test="updateTime != null" >
+        update_time = #{updateTime,jdbcType=TIMESTAMP},
+      </if>
+    </set>
+    where id = #{id,jdbcType=INTEGER}
+  </update>
+  <update id="updateByPrimaryKey" parameterType="com.core.manycloudcommon.entity.NodeImage" >
+    update t_node_image
+    set node_id = #{nodeId,jdbcType=INTEGER},
+      image_type = #{imageType,jdbcType=VARCHAR},
+      image_version = #{imageVersion,jdbcType=VARCHAR},
+      image_param = #{imageParam,jdbcType=VARCHAR},
+      remark_ = #{remark,jdbcType=VARCHAR},
+      status = #{status,jdbcType=INTEGER},
+      create_time = #{createTime,jdbcType=TIMESTAMP},
+      update_time = #{updateTime,jdbcType=TIMESTAMP}
+    where id = #{id,jdbcType=INTEGER}
+  </update>
+</mapper>

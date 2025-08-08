@@ -1,0 +1,559 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="com.core.manycloudcommon.mapper.InstanceInfoMapper" >
+  <resultMap id="BaseResultMap" type="com.core.manycloudcommon.entity.InstanceInfo" >
+    <id column="id" property="id" jdbcType="INTEGER" />
+    <result column="instance_id" property="instanceId" jdbcType="VARCHAR" />
+    <result column="nike" property="nike" jdbcType="VARCHAR" />
+    <result column="order_no" property="orderNo" jdbcType="VARCHAR" />
+    <result column="user_id" property="userId" jdbcType="VARCHAR" />
+    <result column="type" property="type" jdbcType="INTEGER" />
+    <result column="label" property="label" jdbcType="VARCHAR" />
+    <result column="account_id" property="accountId" jdbcType="INTEGER" />
+    <result column="node_id" property="nodeId" jdbcType="INTEGER" />
+    <result column="service_no" property="serviceNo" jdbcType="VARCHAR" />
+    <result column="public_ip" property="publicIp" jdbcType="VARCHAR" />
+    <result column="private_ip" property="privateIp" jdbcType="VARCHAR" />
+    <result column="accelerate_add" property="accelerateAdd" jdbcType="VARCHAR" />
+    <result column="connect_port" property="connectPort" jdbcType="INTEGER" />
+    <result column="connect_account" property="connectAccount" jdbcType="VARCHAR" />
+    <result column="connect_pwd" property="connectPwd" jdbcType="VARCHAR" />
+    <result column="model_id" property="modelId" jdbcType="INTEGER" />
+    <result column="cpu" property="cpu" jdbcType="VARCHAR" />
+    <result column="ram" property="ram" jdbcType="VARCHAR" />
+    <result column="sys_disk" property="sysDisk" jdbcType="DECIMAL" />
+    <result column="data_disk" property="dataDisk" jdbcType="DECIMAL" />
+    <result column="bandwidth" property="bandwidth" jdbcType="DECIMAL" />
+    <result column="flow" property="flow" jdbcType="DECIMAL" />
+    <result column="image" property="image" jdbcType="VARCHAR" />
+    <result column="image_id" property="imageId" jdbcType="INTEGER" />
+    <result column="power_state" property="powerState" jdbcType="VARCHAR" />
+    <result column="status" property="status" jdbcType="INTEGER" />
+    <result column="period" property="period" jdbcType="INTEGER" />
+    <result column="remark" property="remark" jdbcType="VARCHAR" />
+    <result column="create_time" property="createTime" jdbcType="TIMESTAMP" />
+    <result column="end_time" property="endTime" jdbcType="TIMESTAMP" />
+    <result column="update_time" property="updateTime" jdbcType="TIMESTAMP" />
+  </resultMap>
+  <sql id="Base_Column_List" >
+    id, instance_id, nike,order_no, user_id, type, label, account_id, node_id, service_no,
+    public_ip, private_ip, accelerate_add, connect_port, connect_account, connect_pwd, 
+    model_id, cpu, ram, sys_disk, data_disk, bandwidth, flow, image, image_id, power_state,status,period,
+    remark, create_time, end_time, update_time
+  </sql>
+  <select id="selectByPrimaryKey" resultMap="BaseResultMap" parameterType="java.lang.Integer" >
+    select 
+    <include refid="Base_Column_List" />
+    from t_instance_info
+    where id = #{id,jdbcType=INTEGER}
+  </select>
+
+  <select id="selectById" resultMap="BaseResultMap" parameterType="java.lang.String" >
+    select
+    <include refid="Base_Column_List" />
+    from t_instance_info
+    where instance_id = #{instanceId,jdbcType=VARCHAR}
+  </select>
+
+  <select id="selectByStatus" resultMap="BaseResultMap" parameterType="java.lang.Integer" >
+    select
+    <include refid="Base_Column_List" />
+    from t_instance_info
+    where status = #{status,jdbcType=INTEGER}
+  </select>
+
+
+  <select id="selectOrderConfirm" resultType="java.lang.Integer" parameterType="java.lang.String" >
+    select
+    sum(case when 3 > status then 1 else 0 end) as item
+    from t_instance_info
+    where order_no = #{orderNo,jdbcType=VARCHAR}
+  </select>
+
+  <delete id="deleteByPrimaryKey" parameterType="java.lang.Integer" >
+    delete from t_instance_info
+    where id = #{id,jdbcType=INTEGER}
+  </delete>
+  <insert id="insert" parameterType="com.core.manycloudcommon.entity.InstanceInfo" >
+    <selectKey resultType="java.lang.Integer" keyProperty="id" order="AFTER" >
+      SELECT LAST_INSERT_ID()
+    </selectKey>
+    insert into t_instance_info (instance_id, nike, order_no, user_id,
+      type, label, account_id,
+      node_id, service_no, public_ip, 
+      private_ip, accelerate_add, connect_port, 
+      connect_account, connect_pwd, model_id, 
+      cpu, ram, sys_disk, 
+      data_disk, bandwidth, flow, 
+      image, image_id, power_state,status,period,
+      remark, create_time, end_time, 
+      update_time)
+    values (#{instanceId,jdbcType=VARCHAR}, #{nike,jdbcType=VARCHAR},#{orderNo,jdbcType=VARCHAR}, #{userId,jdbcType=VARCHAR},
+      #{type,jdbcType=INTEGER}, #{label,jdbcType=VARCHAR}, #{accountId,jdbcType=INTEGER},
+      #{nodeId,jdbcType=INTEGER}, #{serviceNo,jdbcType=VARCHAR}, #{publicIp,jdbcType=VARCHAR}, 
+      #{privateIp,jdbcType=VARCHAR}, #{accelerateAdd,jdbcType=VARCHAR}, #{connectPort,jdbcType=INTEGER}, 
+      #{connectAccount,jdbcType=VARCHAR}, #{connectPwd,jdbcType=VARCHAR}, #{modelId,jdbcType=INTEGER}, 
+      #{cpu,jdbcType=VARCHAR}, #{ram,jdbcType=VARCHAR}, #{sysDisk,jdbcType=DECIMAL}, 
+      #{dataDisk,jdbcType=DECIMAL}, #{bandwidth,jdbcType=DECIMAL}, #{flow,jdbcType=DECIMAL}, 
+      #{image,jdbcType=VARCHAR}, #{imageId,jdbcType=INTEGER}, #{powerState,jdbcType=VARCHAR}, #{status,jdbcType=INTEGER},#{period,jdbcType=INTEGER},
+      #{remark,jdbcType=VARCHAR}, #{createTime,jdbcType=TIMESTAMP}, #{endTime,jdbcType=TIMESTAMP}, 
+      #{updateTime,jdbcType=TIMESTAMP})
+  </insert>
+  <insert id="insertSelective" parameterType="com.core.manycloudcommon.entity.InstanceInfo" >
+    <selectKey resultType="java.lang.Integer" keyProperty="id" order="AFTER" >
+      SELECT LAST_INSERT_ID()
+    </selectKey>
+    insert into t_instance_info
+    <trim prefix="(" suffix=")" suffixOverrides="," >
+      <if test="instanceId != null" >
+        instance_id,
+      </if>
+      <if test="nike != null" >
+        nike,
+      </if>
+      <if test="orderNo != null" >
+        order_no,
+      </if>
+      <if test="userId != null" >
+        user_id,
+      </if>
+      <if test="type != null" >
+        type,
+      </if>
+      <if test="label != null" >
+        label,
+      </if>
+      <if test="accountId != null" >
+        account_id,
+      </if>
+      <if test="nodeId != null" >
+        node_id,
+      </if>
+      <if test="serviceNo != null" >
+        service_no,
+      </if>
+      <if test="publicIp != null" >
+        public_ip,
+      </if>
+      <if test="privateIp != null" >
+        private_ip,
+      </if>
+      <if test="accelerateAdd != null" >
+        accelerate_add,
+      </if>
+      <if test="connectPort != null" >
+        connect_port,
+      </if>
+      <if test="connectAccount != null" >
+        connect_account,
+      </if>
+      <if test="connectPwd != null" >
+        connect_pwd,
+      </if>
+      <if test="modelId != null" >
+        model_id,
+      </if>
+      <if test="cpu != null" >
+        cpu,
+      </if>
+      <if test="ram != null" >
+        ram,
+      </if>
+      <if test="sysDisk != null" >
+        sys_disk,
+      </if>
+      <if test="dataDisk != null" >
+        data_disk,
+      </if>
+      <if test="bandwidth != null" >
+        bandwidth,
+      </if>
+      <if test="flow != null" >
+        flow,
+      </if>
+      <if test="image != null" >
+        image,
+      </if>
+      <if test="imageId != null" >
+        image_id,
+      </if>
+      <if test="powerState != null" >
+        power_state,
+      </if>
+      <if test="status != null" >
+        status,
+      </if>
+      <if test="period != null" >
+        period,
+      </if>
+      <if test="remark != null" >
+        remark,
+      </if>
+      <if test="createTime != null" >
+        create_time,
+      </if>
+      <if test="endTime != null" >
+        end_time,
+      </if>
+      <if test="updateTime != null" >
+        update_time,
+      </if>
+    </trim>
+    <trim prefix="values (" suffix=")" suffixOverrides="," >
+      <if test="instanceId != null" >
+        #{instanceId,jdbcType=VARCHAR},
+      </if>
+      <if test="nike != null" >
+        #{nike,jdbcType=VARCHAR},
+      </if>
+      <if test="orderNo != null" >
+        #{orderNo,jdbcType=VARCHAR},
+      </if>
+      <if test="userId != null" >
+        #{userId,jdbcType=VARCHAR},
+      </if>
+      <if test="type != null" >
+        #{type,jdbcType=INTEGER},
+      </if>
+      <if test="label != null" >
+        #{label,jdbcType=VARCHAR},
+      </if>
+      <if test="accountId != null" >
+        #{accountId,jdbcType=INTEGER},
+      </if>
+      <if test="nodeId != null" >
+        #{nodeId,jdbcType=INTEGER},
+      </if>
+      <if test="serviceNo != null" >
+        #{serviceNo,jdbcType=VARCHAR},
+      </if>
+      <if test="publicIp != null" >
+        #{publicIp,jdbcType=VARCHAR},
+      </if>
+      <if test="privateIp != null" >
+        #{privateIp,jdbcType=VARCHAR},
+      </if>
+      <if test="accelerateAdd != null" >
+        #{accelerateAdd,jdbcType=VARCHAR},
+      </if>
+      <if test="connectPort != null" >
+        #{connectPort,jdbcType=INTEGER},
+      </if>
+      <if test="connectAccount != null" >
+        #{connectAccount,jdbcType=VARCHAR},
+      </if>
+      <if test="connectPwd != null" >
+        #{connectPwd,jdbcType=VARCHAR},
+      </if>
+      <if test="modelId != null" >
+        #{modelId,jdbcType=INTEGER},
+      </if>
+      <if test="cpu != null" >
+        #{cpu,jdbcType=VARCHAR},
+      </if>
+      <if test="ram != null" >
+        #{ram,jdbcType=VARCHAR},
+      </if>
+      <if test="sysDisk != null" >
+        #{sysDisk,jdbcType=DECIMAL},
+      </if>
+      <if test="dataDisk != null" >
+        #{dataDisk,jdbcType=DECIMAL},
+      </if>
+      <if test="bandwidth != null" >
+        #{bandwidth,jdbcType=DECIMAL},
+      </if>
+      <if test="flow != null" >
+        #{flow,jdbcType=DECIMAL},
+      </if>
+      <if test="image != null" >
+        #{image,jdbcType=VARCHAR},
+      </if>
+      <if test="imageId != null" >
+        #{imageId,jdbcType=INTEGER},
+      </if>
+      <if test="powerState != null" >
+        #{powerState,jdbcType=VARCHAR},
+      </if>
+      <if test="status != null" >
+        #{status,jdbcType=INTEGER},
+      </if>
+      <if test="period != null" >
+        #{period,jdbcType=INTEGER},
+      </if>
+      <if test="remark != null" >
+        #{remark,jdbcType=VARCHAR},
+      </if>
+      <if test="createTime != null" >
+        #{createTime,jdbcType=TIMESTAMP},
+      </if>
+      <if test="endTime != null" >
+        #{endTime,jdbcType=TIMESTAMP},
+      </if>
+      <if test="updateTime != null" >
+        #{updateTime,jdbcType=TIMESTAMP},
+      </if>
+    </trim>
+  </insert>
+  <update id="updateByPrimaryKeySelective" parameterType="com.core.manycloudcommon.entity.InstanceInfo" >
+    update t_instance_info
+    <set >
+      <if test="instanceId != null" >
+        instance_id = #{instanceId,jdbcType=VARCHAR},
+      </if>
+      <if test="nike != null" >
+        nike = #{nike,jdbcType=VARCHAR},
+      </if>
+      <if test="orderNo != null" >
+        order_no = #{orderNo,jdbcType=VARCHAR},
+      </if>
+      <if test="userId != null" >
+        user_id = #{userId,jdbcType=VARCHAR},
+      </if>
+      <if test="type != null" >
+        type = #{type,jdbcType=INTEGER},
+      </if>
+      <if test="label != null" >
+        label = #{label,jdbcType=VARCHAR},
+      </if>
+      <if test="accountId != null" >
+        account_id = #{accountId,jdbcType=INTEGER},
+      </if>
+      <if test="nodeId != null" >
+        node_id = #{nodeId,jdbcType=INTEGER},
+      </if>
+      <if test="serviceNo != null" >
+        service_no = #{serviceNo,jdbcType=VARCHAR},
+      </if>
+      <if test="publicIp != null" >
+        public_ip = #{publicIp,jdbcType=VARCHAR},
+      </if>
+      <if test="privateIp != null" >
+        private_ip = #{privateIp,jdbcType=VARCHAR},
+      </if>
+      <if test="accelerateAdd != null" >
+        accelerate_add = #{accelerateAdd,jdbcType=VARCHAR},
+      </if>
+      <if test="connectPort != null" >
+        connect_port = #{connectPort,jdbcType=INTEGER},
+      </if>
+      <if test="connectAccount != null" >
+        connect_account = #{connectAccount,jdbcType=VARCHAR},
+      </if>
+      <if test="connectPwd != null" >
+        connect_pwd = #{connectPwd,jdbcType=VARCHAR},
+      </if>
+      <if test="modelId != null" >
+        model_id = #{modelId,jdbcType=INTEGER},
+      </if>
+      <if test="cpu != null" >
+        cpu = #{cpu,jdbcType=VARCHAR},
+      </if>
+      <if test="ram != null" >
+        ram = #{ram,jdbcType=VARCHAR},
+      </if>
+      <if test="sysDisk != null" >
+        sys_disk = #{sysDisk,jdbcType=DECIMAL},
+      </if>
+      <if test="dataDisk != null" >
+        data_disk = #{dataDisk,jdbcType=DECIMAL},
+      </if>
+      <if test="bandwidth != null" >
+        bandwidth = #{bandwidth,jdbcType=DECIMAL},
+      </if>
+      <if test="flow != null" >
+        flow = #{flow,jdbcType=DECIMAL},
+      </if>
+      <if test="image != null" >
+        image = #{image,jdbcType=VARCHAR},
+      </if>
+      <if test="imageId != null" >
+        image_id = #{imageId,jdbcType=INTEGER},
+      </if>
+      <if test="powerState != null" >
+        power_state = #{powerState,jdbcType=VARCHAR},
+      </if>
+      <if test="status != null" >
+        status = #{status,jdbcType=INTEGER},
+      </if>
+      <if test="period != null" >
+        period = #{period,jdbcType=INTEGER},
+      </if>
+      <if test="remark != null" >
+        remark = #{remark,jdbcType=VARCHAR},
+      </if>
+      <if test="createTime != null" >
+        create_time = #{createTime,jdbcType=TIMESTAMP},
+      </if>
+      <if test="endTime != null" >
+        end_time = #{endTime,jdbcType=TIMESTAMP},
+      </if>
+      <if test="updateTime != null" >
+        update_time = #{updateTime,jdbcType=TIMESTAMP},
+      </if>
+    </set>
+    where id = #{id,jdbcType=INTEGER}
+  </update>
+  <update id="updateByPrimaryKey" parameterType="com.core.manycloudcommon.entity.InstanceInfo" >
+    update t_instance_info
+    set instance_id = #{instanceId,jdbcType=VARCHAR},
+      nike = #{nike,jdbcType=VARCHAR},
+      order_no = #{orderNo,jdbcType=VARCHAR},
+      user_id = #{userId,jdbcType=VARCHAR},
+      type = #{type,jdbcType=INTEGER},
+      label = #{label,jdbcType=VARCHAR},
+      account_id = #{accountId,jdbcType=INTEGER},
+      node_id = #{nodeId,jdbcType=INTEGER},
+      service_no = #{serviceNo,jdbcType=VARCHAR},
+      public_ip = #{publicIp,jdbcType=VARCHAR},
+      private_ip = #{privateIp,jdbcType=VARCHAR},
+      accelerate_add = #{accelerateAdd,jdbcType=VARCHAR},
+      connect_port = #{connectPort,jdbcType=INTEGER},
+      connect_account = #{connectAccount,jdbcType=VARCHAR},
+      connect_pwd = #{connectPwd,jdbcType=VARCHAR},
+      model_id = #{modelId,jdbcType=INTEGER},
+      cpu = #{cpu,jdbcType=VARCHAR},
+      ram = #{ram,jdbcType=VARCHAR},
+      sys_disk = #{sysDisk,jdbcType=DECIMAL},
+      data_disk = #{dataDisk,jdbcType=DECIMAL},
+      bandwidth = #{bandwidth,jdbcType=DECIMAL},
+      flow = #{flow,jdbcType=DECIMAL},
+      image = #{image,jdbcType=VARCHAR},
+      image_id = #{imageId,jdbcType=INTEGER},
+      power_state = #{powerState,jdbcType=VARCHAR},
+      status = #{status,jdbcType=INTEGER},
+      period = #{period,jdbcType=INTEGER},
+      remark = #{remark,jdbcType=VARCHAR},
+      create_time = #{createTime,jdbcType=TIMESTAMP},
+      end_time = #{endTime,jdbcType=TIMESTAMP},
+      update_time = #{updateTime,jdbcType=TIMESTAMP}
+    where id = #{id,jdbcType=INTEGER}
+  </update>
+
+
+  <select id="selectListByUser" resultType="com.core.manycloudcommon.vo.instance.InstanceUserVO">
+    select
+        i.instance_id as instanceId,
+        i.nike,
+    CONCAT(i.cpu,'核|',i.ram,'G|',(case when i.bandwidth = 0 then '不限带宽' else CONCAT(CAST(i.bandwidth AS SIGNED),'M') end))as config,
+        i.public_ip as publicIp,
+        i.private_ip as privateIp,
+        i.power_state as powerState,
+        i.status,
+        i.period,
+        i.create_time as createTime,
+        i.end_time as endTime,
+        n.node_name as nodeName,
+        g.name as groupName
+    from
+        t_instance_info as i
+    left join
+        t_node_info as n on n.id = i.node_id
+    left join
+        t_group_product as gp on gp.instance_id = i.instance_id
+    left join
+        t_group_info as g on g.id = gp.group_id
+    where
+      i.user_id = #{userId,jdbcType=VARCHAR}
+      and (i.status = 0 or i.status = 1 or i.status = 3 or i.status = 4 or i.status = 5 )
+    <if test="powerState != null" >
+      and power_state = #{powerState,jdbcType=VARCHAR}
+    </if>
+    <if test="status != null" >
+      and i.status = #{status,jdbcType=INTEGER}
+    </if>
+    <if test="groupId != null" >
+      and gp.group_id = #{groupId,jdbcType=INTEGER}
+    </if>
+    <if test="instanceId != null" >
+      and (i.instance_id = #{instanceId,jdbcType=VARCHAR} or i.public_ip = #{instanceId,jdbcType=VARCHAR})
+    </if>
+    <if test="sort == null" >
+      order by i.id desc
+    </if>
+    <if test="sort == 0" >
+      order by i.end_time
+    </if>
+    <if test="sort == 1" >
+      order by i.end_time desc
+    </if>
+  </select>
+
+
+  <select id="selectList" resultType="com.core.manycloudcommon.vo.instance.InstanceUserVO">
+    select
+    i.instance_id as instanceId,
+    i.nike,
+    CONCAT(i.cpu,'核|',i.ram,'G|',(case when i.bandwidth = 0 then '不限带宽' else CONCAT(CAST(i.bandwidth AS SIGNED),'M') end))as config,
+    i.public_ip as publicIp,
+    i.private_ip as privateIp,
+    i.power_state as powerState,
+    i.status,
+    i.period,
+    i.create_time as createTime,
+    i.end_time as endTime,
+    n.node_name as nodeName,
+    u.account
+    from
+    t_instance_info as i
+    left join
+    t_node_info as n on n.id = i.node_id
+    left join
+    t_user_info as u on u.user_id = i.user_id
+    where
+    1 = 1
+    <if test="account != null" >
+      and (u.account like '%${account}%' or u.email like '%${account}%')
+    </if>
+    <if test="powerState != null" >
+      and power_state = #{powerState,jdbcType=VARCHAR}
+    </if>
+    <if test="status != null" >
+      and i.status = #{status,jdbcType=INTEGER}
+    </if>
+    <if test="instanceId != null" >
+      and (i.instance_id = #{instanceId,jdbcType=VARCHAR} or i.public_ip = #{instanceId,jdbcType=VARCHAR})
+    </if>
+    <if test="sort == null" >
+      order by i.id desc
+    </if>
+    <if test="sort == 0" >
+      order by i.end_time
+    </if>
+    <if test="sort == 1" >
+      order by i.end_time desc
+    </if>
+  </select>
+
+  <select id="selectNumByUsers" resultType="java.lang.Integer" parameterType="java.util.List">
+    select
+    IFNULL(count(1),1)as totalNum
+    from
+      t_instance_info
+    where
+      user_id in
+    <foreach item="item" collection="list" separator="," open="(" close=")">
+      #{item,jdbcType=VARCHAR}
+    </foreach>
+    and
+      (status = 3 or status = 4)
+  </select>
+
+
+  <select id="selectListByUserSNum" resultType="com.core.manycloudcommon.vo.finance.UserProductNumVO" parameterType="java.util.List">
+    select
+    user_id as userId,
+    IFNULL(count(1),1)as num
+    from
+    t_instance_info
+    where
+    user_id in
+    <foreach item="item" collection="list" separator="," open="(" close=")">
+      #{item,jdbcType=VARCHAR}
+    </foreach>
+    and
+    (status = 3 or status = 4)
+    group by user_id
+  </select>
+
+</mapper>

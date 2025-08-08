@@ -1,0 +1,244 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="com.core.manycloudcommon.mapper.FinanceWithdrawalMapper" >
+  <resultMap id="BaseResultMap" type="com.core.manycloudcommon.entity.FinanceWithdrawal" >
+    <id column="id" property="id" jdbcType="INTEGER" />
+    <result column="user_id" property="userId" jdbcType="VARCHAR" />
+    <result column="withdrawal_no" property="withdrawalNo" jdbcType="VARCHAR" />
+    <result column="money_comm" property="moneyComm" jdbcType="DECIMAL" />
+    <result column="money_balance" property="moneyBalance" jdbcType="DECIMAL" />
+    <result column="money_num" property="moneyNum" jdbcType="DECIMAL" />
+    <result column="money_tax" property="moneyTax" jdbcType="DECIMAL" />
+    <result column="tax_ratio" property="taxRatio" jdbcType="DECIMAL" />
+    <result column="account" property="account" jdbcType="VARCHAR" />
+    <result column="name" property="name" jdbcType="VARCHAR" />
+    <result column="way" property="way" jdbcType="INTEGER" />
+    <result column="status" property="status" jdbcType="INTEGER" />
+    <result column="remark" property="remark" jdbcType="VARCHAR" />
+    <result column="create_time" property="createTime" jdbcType="TIMESTAMP" />
+    <result column="update_time" property="updateTime" jdbcType="TIMESTAMP" />
+    <result column="email" property="email" jdbcType="VARCHAR" />
+  </resultMap>
+  <sql id="Base_Column_List" >
+    id, user_id, withdrawal_no, money_comm, money_balance, money_num, money_tax, tax_ratio, 
+    account, name, way, status, remark, create_time, update_time
+  </sql>
+  <select id="selectByPrimaryKey" resultMap="BaseResultMap" parameterType="java.lang.Integer" >
+    select 
+    <include refid="Base_Column_List" />
+    from t_finance_withdrawal
+    where id = #{id,jdbcType=INTEGER}
+  </select>
+
+  <select id="selectByUserId" resultMap="BaseResultMap">
+    select
+    <include refid="Base_Column_List" />
+    from t_finance_withdrawal
+    where
+      user_id = #{userId,jdbcType=VARCHAR}
+    <if test="status != null" >
+      and status = #{status,jdbcType=INTEGER}
+    </if>
+    order by  id  desc
+  </select>
+
+
+  <select id="selectList" resultMap="BaseResultMap">
+    select
+    w.id, w.user_id, w.withdrawal_no, w.money_comm, w.money_balance, w.money_num, w.money_tax, w.tax_ratio,
+    w.account, w.name, w.way, w.status, w.remark, w.create_time, w.update_time,u.email
+    from
+      t_finance_withdrawal as w
+    left join
+      t_user_info as u on u.user_id = w.user_id
+    where
+      1 = 1
+    <if test="account != null" >
+      and u.account like '%${account}%'
+    </if>
+    <if test="status != null" >
+      and w.status = #{status,jdbcType=INTEGER}
+    </if>
+    order by w.id  desc
+  </select>
+
+  <delete id="deleteByPrimaryKey" parameterType="java.lang.Integer" >
+    delete from t_finance_withdrawal
+    where id = #{id,jdbcType=INTEGER}
+  </delete>
+  <insert id="insert" parameterType="com.core.manycloudcommon.entity.FinanceWithdrawal" >
+    <selectKey resultType="java.lang.Integer" keyProperty="id" order="AFTER" >
+      SELECT LAST_INSERT_ID()
+    </selectKey>
+    insert into t_finance_withdrawal (user_id, withdrawal_no, money_comm, 
+      money_balance, money_num, money_tax, 
+      tax_ratio, account, name, 
+      way, status, remark, 
+      create_time, update_time)
+    values (#{userId,jdbcType=VARCHAR}, #{withdrawalNo,jdbcType=VARCHAR}, #{moneyComm,jdbcType=DECIMAL}, 
+      #{moneyBalance,jdbcType=DECIMAL}, #{moneyNum,jdbcType=DECIMAL}, #{moneyTax,jdbcType=DECIMAL}, 
+      #{taxRatio,jdbcType=DECIMAL}, #{account,jdbcType=VARCHAR}, #{name,jdbcType=VARCHAR}, 
+      #{way,jdbcType=INTEGER}, #{status,jdbcType=INTEGER}, #{remark,jdbcType=VARCHAR}, 
+      #{createTime,jdbcType=TIMESTAMP}, #{updateTime,jdbcType=TIMESTAMP})
+  </insert>
+  <insert id="insertSelective" parameterType="com.core.manycloudcommon.entity.FinanceWithdrawal" >
+    <selectKey resultType="java.lang.Integer" keyProperty="id" order="AFTER" >
+      SELECT LAST_INSERT_ID()
+    </selectKey>
+    insert into t_finance_withdrawal
+    <trim prefix="(" suffix=")" suffixOverrides="," >
+      <if test="userId != null" >
+        user_id,
+      </if>
+      <if test="withdrawalNo != null" >
+        withdrawal_no,
+      </if>
+      <if test="moneyComm != null" >
+        money_comm,
+      </if>
+      <if test="moneyBalance != null" >
+        money_balance,
+      </if>
+      <if test="moneyNum != null" >
+        money_num,
+      </if>
+      <if test="moneyTax != null" >
+        money_tax,
+      </if>
+      <if test="taxRatio != null" >
+        tax_ratio,
+      </if>
+      <if test="account != null" >
+        account,
+      </if>
+      <if test="name != null" >
+        name,
+      </if>
+      <if test="way != null" >
+        way,
+      </if>
+      <if test="status != null" >
+        status,
+      </if>
+      <if test="remark != null" >
+        remark,
+      </if>
+      <if test="createTime != null" >
+        create_time,
+      </if>
+      <if test="updateTime != null" >
+        update_time,
+      </if>
+    </trim>
+    <trim prefix="values (" suffix=")" suffixOverrides="," >
+      <if test="userId != null" >
+        #{userId,jdbcType=VARCHAR},
+      </if>
+      <if test="withdrawalNo != null" >
+        #{withdrawalNo,jdbcType=VARCHAR},
+      </if>
+      <if test="moneyComm != null" >
+        #{moneyComm,jdbcType=DECIMAL},
+      </if>
+      <if test="moneyBalance != null" >
+        #{moneyBalance,jdbcType=DECIMAL},
+      </if>
+      <if test="moneyNum != null" >
+        #{moneyNum,jdbcType=DECIMAL},
+      </if>
+      <if test="moneyTax != null" >
+        #{moneyTax,jdbcType=DECIMAL},
+      </if>
+      <if test="taxRatio != null" >
+        #{taxRatio,jdbcType=DECIMAL},
+      </if>
+      <if test="account != null" >
+        #{account,jdbcType=VARCHAR},
+      </if>
+      <if test="name != null" >
+        #{name,jdbcType=VARCHAR},
+      </if>
+      <if test="way != null" >
+        #{way,jdbcType=INTEGER},
+      </if>
+      <if test="status != null" >
+        #{status,jdbcType=INTEGER},
+      </if>
+      <if test="remark != null" >
+        #{remark,jdbcType=VARCHAR},
+      </if>
+      <if test="createTime != null" >
+        #{createTime,jdbcType=TIMESTAMP},
+      </if>
+      <if test="updateTime != null" >
+        #{updateTime,jdbcType=TIMESTAMP},
+      </if>
+    </trim>
+  </insert>
+  <update id="updateByPrimaryKeySelective" parameterType="com.core.manycloudcommon.entity.FinanceWithdrawal" >
+    update t_finance_withdrawal
+    <set >
+      <if test="userId != null" >
+        user_id = #{userId,jdbcType=VARCHAR},
+      </if>
+      <if test="withdrawalNo != null" >
+        withdrawal_no = #{withdrawalNo,jdbcType=VARCHAR},
+      </if>
+      <if test="moneyComm != null" >
+        money_comm = #{moneyComm,jdbcType=DECIMAL},
+      </if>
+      <if test="moneyBalance != null" >
+        money_balance = #{moneyBalance,jdbcType=DECIMAL},
+      </if>
+      <if test="moneyNum != null" >
+        money_num = #{moneyNum,jdbcType=DECIMAL},
+      </if>
+      <if test="moneyTax != null" >
+        money_tax = #{moneyTax,jdbcType=DECIMAL},
+      </if>
+      <if test="taxRatio != null" >
+        tax_ratio = #{taxRatio,jdbcType=DECIMAL},
+      </if>
+      <if test="account != null" >
+        account = #{account,jdbcType=VARCHAR},
+      </if>
+      <if test="name != null" >
+        name = #{name,jdbcType=VARCHAR},
+      </if>
+      <if test="way != null" >
+        way = #{way,jdbcType=INTEGER},
+      </if>
+      <if test="status != null" >
+        status = #{status,jdbcType=INTEGER},
+      </if>
+      <if test="remark != null" >
+        remark = #{remark,jdbcType=VARCHAR},
+      </if>
+      <if test="createTime != null" >
+        create_time = #{createTime,jdbcType=TIMESTAMP},
+      </if>
+      <if test="updateTime != null" >
+        update_time = #{updateTime,jdbcType=TIMESTAMP},
+      </if>
+    </set>
+    where id = #{id,jdbcType=INTEGER}
+  </update>
+  <update id="updateByPrimaryKey" parameterType="com.core.manycloudcommon.entity.FinanceWithdrawal" >
+    update t_finance_withdrawal
+    set user_id = #{userId,jdbcType=VARCHAR},
+      withdrawal_no = #{withdrawalNo,jdbcType=VARCHAR},
+      money_comm = #{moneyComm,jdbcType=DECIMAL},
+      money_balance = #{moneyBalance,jdbcType=DECIMAL},
+      money_num = #{moneyNum,jdbcType=DECIMAL},
+      money_tax = #{moneyTax,jdbcType=DECIMAL},
+      tax_ratio = #{taxRatio,jdbcType=DECIMAL},
+      account = #{account,jdbcType=VARCHAR},
+      name = #{name,jdbcType=VARCHAR},
+      way = #{way,jdbcType=INTEGER},
+      status = #{status,jdbcType=INTEGER},
+      remark = #{remark,jdbcType=VARCHAR},
+      create_time = #{createTime,jdbcType=TIMESTAMP},
+      update_time = #{updateTime,jdbcType=TIMESTAMP}
+    where id = #{id,jdbcType=INTEGER}
+  </update>
+</mapper>

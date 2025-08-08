@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="com.core.manycloudcommon.mapper.MedalCommissionMapper" >
+  <resultMap id="BaseResultMap" type="com.core.manycloudcommon.entity.MedalCommission" >
+    <id column="id" property="id" jdbcType="INTEGER" />
+    <result column="medal_id" property="medalId" jdbcType="INTEGER" />
+    <result column="level_id" property="levelId" jdbcType="INTEGER" />
+    <result column="ratio" property="ratio" jdbcType="DECIMAL" />
+    <result column="remark" property="remark" jdbcType="VARCHAR" />
+    <result column="create_time" property="createTime" jdbcType="TIMESTAMP" />
+    <result column="update_time" property="updateTime" jdbcType="TIMESTAMP" />
+  </resultMap>
+  <sql id="Base_Column_List" >
+    id, medal_id, level_id, ratio, remark, create_time, update_time
+  </sql>
+  <select id="selectByPrimaryKey" resultMap="BaseResultMap" parameterType="java.lang.Integer" >
+    select 
+    <include refid="Base_Column_List" />
+    from t_medal_commission
+    where id = #{id,jdbcType=INTEGER}
+  </select>
+
+  <select id="selectByRatio" resultMap="BaseResultMap" parameterType="java.lang.Integer" >
+    select
+    <include refid="Base_Column_List" />
+    from t_medal_commission
+    where medal_id = #{medalId,jdbcType=INTEGER} and level_id = #{levelId,jdbcType=INTEGER}
+  </select>
+
+  <delete id="deleteByPrimaryKey" parameterType="java.lang.Integer" >
+    delete from t_medal_commission
+    where id = #{id,jdbcType=INTEGER}
+  </delete>
+  <insert id="insert" parameterType="com.core.manycloudcommon.entity.MedalCommission" >
+    <selectKey resultType="java.lang.Integer" keyProperty="id" order="AFTER" >
+      SELECT LAST_INSERT_ID()
+    </selectKey>
+    insert into t_medal_commission (medal_id, level_id, ratio, 
+      remark, create_time, update_time
+      )
+    values (#{medalId,jdbcType=INTEGER}, #{levelId,jdbcType=INTEGER}, #{ratio,jdbcType=DECIMAL}, 
+      #{remark,jdbcType=VARCHAR}, #{createTime,jdbcType=TIMESTAMP}, #{updateTime,jdbcType=TIMESTAMP}
+      )
+  </insert>
+  <insert id="insertSelective" parameterType="com.core.manycloudcommon.entity.MedalCommission" >
+    <selectKey resultType="java.lang.Integer" keyProperty="id" order="AFTER" >
+      SELECT LAST_INSERT_ID()
+    </selectKey>
+    insert into t_medal_commission
+    <trim prefix="(" suffix=")" suffixOverrides="," >
+      <if test="medalId != null" >
+        medal_id,
+      </if>
+      <if test="levelId != null" >
+        level_id,
+      </if>
+      <if test="ratio != null" >
+        ratio,
+      </if>
+      <if test="remark != null" >
+        remark,
+      </if>
+      <if test="createTime != null" >
+        create_time,
+      </if>
+      <if test="updateTime != null" >
+        update_time,
+      </if>
+    </trim>
+    <trim prefix="values (" suffix=")" suffixOverrides="," >
+      <if test="medalId != null" >
+        #{medalId,jdbcType=INTEGER},
+      </if>
+      <if test="levelId != null" >
+        #{levelId,jdbcType=INTEGER},
+      </if>
+      <if test="ratio != null" >
+        #{ratio,jdbcType=DECIMAL},
+      </if>
+      <if test="remark != null" >
+        #{remark,jdbcType=VARCHAR},
+      </if>
+      <if test="createTime != null" >
+        #{createTime,jdbcType=TIMESTAMP},
+      </if>
+      <if test="updateTime != null" >
+        #{updateTime,jdbcType=TIMESTAMP},
+      </if>
+    </trim>
+  </insert>
+  <update id="updateByPrimaryKeySelective" parameterType="com.core.manycloudcommon.entity.MedalCommission" >
+    update t_medal_commission
+    <set >
+      <if test="medalId != null" >
+        medal_id = #{medalId,jdbcType=INTEGER},
+      </if>
+      <if test="levelId != null" >
+        level_id = #{levelId,jdbcType=INTEGER},
+      </if>
+      <if test="ratio != null" >
+        ratio = #{ratio,jdbcType=DECIMAL},
+      </if>
+      <if test="remark != null" >
+        remark = #{remark,jdbcType=VARCHAR},
+      </if>
+      <if test="createTime != null" >
+        create_time = #{createTime,jdbcType=TIMESTAMP},
+      </if>
+      <if test="updateTime != null" >
+        update_time = #{updateTime,jdbcType=TIMESTAMP},
+      </if>
+    </set>
+    where id = #{id,jdbcType=INTEGER}
+  </update>
+  <update id="updateByPrimaryKey" parameterType="com.core.manycloudcommon.entity.MedalCommission" >
+    update t_medal_commission
+    set medal_id = #{medalId,jdbcType=INTEGER},
+      level_id = #{levelId,jdbcType=INTEGER},
+      ratio = #{ratio,jdbcType=DECIMAL},
+      remark = #{remark,jdbcType=VARCHAR},
+      create_time = #{createTime,jdbcType=TIMESTAMP},
+      update_time = #{updateTime,jdbcType=TIMESTAMP}
+    where id = #{id,jdbcType=INTEGER}
+  </update>
+</mapper>

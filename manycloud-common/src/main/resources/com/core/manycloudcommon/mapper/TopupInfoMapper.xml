@@ -1,0 +1,183 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="com.core.manycloudcommon.mapper.TopupInfoMapper" >
+  <resultMap id="BaseResultMap" type="com.core.manycloudcommon.entity.TopupInfo" >
+    <id column="id" property="id" jdbcType="INTEGER" />
+    <result column="user_id" property="userId" jdbcType="VARCHAR" />
+    <result column="topup_no" property="topupNo" jdbcType="VARCHAR" />
+    <result column="intent_id" property="intentId" jdbcType="VARCHAR" />
+    <result column="order_no" property="orderNo" jdbcType="VARCHAR" />
+    <result column="type" property="type" jdbcType="INTEGER" />
+    <result column="money_num" property="moneyNum" jdbcType="DECIMAL" />
+    <result column="way" property="way" jdbcType="INTEGER" />
+    <result column="status" property="status" jdbcType="INTEGER" />
+    <result column="remark" property="remark" jdbcType="VARCHAR" />
+    <result column="create_time" property="createTime" jdbcType="TIMESTAMP" />
+    <result column="update_time" property="updateTime" jdbcType="TIMESTAMP" />
+  </resultMap>
+  <sql id="Base_Column_List" >
+    id, user_id, topup_no, intent_id, order_no, type, money_num, way, status, remark, 
+    create_time, update_time
+  </sql>
+  <select id="selectByPrimaryKey" resultMap="BaseResultMap" parameterType="java.lang.Integer" >
+    select 
+    <include refid="Base_Column_List" />
+    from t_topup_info
+    where id = #{id,jdbcType=INTEGER}
+  </select>
+
+  <select id="selectByNo" resultMap="BaseResultMap" parameterType="java.lang.String" >
+    select
+    <include refid="Base_Column_List" />
+    from t_topup_info
+    where topup_no = #{topupNo,jdbcType=VARCHAR}
+  </select>
+
+  <delete id="deleteByPrimaryKey" parameterType="java.lang.Integer" >
+    delete from t_topup_info
+    where id = #{id,jdbcType=INTEGER}
+  </delete>
+  <insert id="insert" parameterType="com.core.manycloudcommon.entity.TopupInfo" >
+    <selectKey resultType="java.lang.Integer" keyProperty="id" order="AFTER" >
+      SELECT LAST_INSERT_ID()
+    </selectKey>
+    insert into t_topup_info (user_id, topup_no, intent_id, 
+      order_no, type, money_num, 
+      way, status, remark, 
+      create_time, update_time)
+    values (#{userId,jdbcType=VARCHAR}, #{topupNo,jdbcType=VARCHAR}, #{intentId,jdbcType=VARCHAR}, 
+      #{orderNo,jdbcType=VARCHAR}, #{type,jdbcType=INTEGER}, #{moneyNum,jdbcType=DECIMAL}, 
+      #{way,jdbcType=INTEGER}, #{status,jdbcType=INTEGER}, #{remark,jdbcType=VARCHAR}, 
+      #{createTime,jdbcType=TIMESTAMP}, #{updateTime,jdbcType=TIMESTAMP})
+  </insert>
+  <insert id="insertSelective" parameterType="com.core.manycloudcommon.entity.TopupInfo" >
+    <selectKey resultType="java.lang.Integer" keyProperty="id" order="AFTER" >
+      SELECT LAST_INSERT_ID()
+    </selectKey>
+    insert into t_topup_info
+    <trim prefix="(" suffix=")" suffixOverrides="," >
+      <if test="userId != null" >
+        user_id,
+      </if>
+      <if test="topupNo != null" >
+        topup_no,
+      </if>
+      <if test="intentId != null" >
+        intent_id,
+      </if>
+      <if test="orderNo != null" >
+        order_no,
+      </if>
+      <if test="type != null" >
+        type,
+      </if>
+      <if test="moneyNum != null" >
+        money_num,
+      </if>
+      <if test="way != null" >
+        way,
+      </if>
+      <if test="status != null" >
+        status,
+      </if>
+      <if test="remark != null" >
+        remark,
+      </if>
+      <if test="createTime != null" >
+        create_time,
+      </if>
+      <if test="updateTime != null" >
+        update_time,
+      </if>
+    </trim>
+    <trim prefix="values (" suffix=")" suffixOverrides="," >
+      <if test="userId != null" >
+        #{userId,jdbcType=VARCHAR},
+      </if>
+      <if test="topupNo != null" >
+        #{topupNo,jdbcType=VARCHAR},
+      </if>
+      <if test="intentId != null" >
+        #{intentId,jdbcType=VARCHAR},
+      </if>
+      <if test="orderNo != null" >
+        #{orderNo,jdbcType=VARCHAR},
+      </if>
+      <if test="type != null" >
+        #{type,jdbcType=INTEGER},
+      </if>
+      <if test="moneyNum != null" >
+        #{moneyNum,jdbcType=DECIMAL},
+      </if>
+      <if test="way != null" >
+        #{way,jdbcType=INTEGER},
+      </if>
+      <if test="status != null" >
+        #{status,jdbcType=INTEGER},
+      </if>
+      <if test="remark != null" >
+        #{remark,jdbcType=VARCHAR},
+      </if>
+      <if test="createTime != null" >
+        #{createTime,jdbcType=TIMESTAMP},
+      </if>
+      <if test="updateTime != null" >
+        #{updateTime,jdbcType=TIMESTAMP},
+      </if>
+    </trim>
+  </insert>
+  <update id="updateByPrimaryKeySelective" parameterType="com.core.manycloudcommon.entity.TopupInfo" >
+    update t_topup_info
+    <set >
+      <if test="userId != null" >
+        user_id = #{userId,jdbcType=VARCHAR},
+      </if>
+      <if test="topupNo != null" >
+        topup_no = #{topupNo,jdbcType=VARCHAR},
+      </if>
+      <if test="intentId != null" >
+        intent_id = #{intentId,jdbcType=VARCHAR},
+      </if>
+      <if test="orderNo != null" >
+        order_no = #{orderNo,jdbcType=VARCHAR},
+      </if>
+      <if test="type != null" >
+        type = #{type,jdbcType=INTEGER},
+      </if>
+      <if test="moneyNum != null" >
+        money_num = #{moneyNum,jdbcType=DECIMAL},
+      </if>
+      <if test="way != null" >
+        way = #{way,jdbcType=INTEGER},
+      </if>
+      <if test="status != null" >
+        status = #{status,jdbcType=INTEGER},
+      </if>
+      <if test="remark != null" >
+        remark = #{remark,jdbcType=VARCHAR},
+      </if>
+      <if test="createTime != null" >
+        create_time = #{createTime,jdbcType=TIMESTAMP},
+      </if>
+      <if test="updateTime != null" >
+        update_time = #{updateTime,jdbcType=TIMESTAMP},
+      </if>
+    </set>
+    where id = #{id,jdbcType=INTEGER}
+  </update>
+  <update id="updateByPrimaryKey" parameterType="com.core.manycloudcommon.entity.TopupInfo" >
+    update t_topup_info
+    set user_id = #{userId,jdbcType=VARCHAR},
+      topup_no = #{topupNo,jdbcType=VARCHAR},
+      intent_id = #{intentId,jdbcType=VARCHAR},
+      order_no = #{orderNo,jdbcType=VARCHAR},
+      type = #{type,jdbcType=INTEGER},
+      money_num = #{moneyNum,jdbcType=DECIMAL},
+      way = #{way,jdbcType=INTEGER},
+      status = #{status,jdbcType=INTEGER},
+      remark = #{remark,jdbcType=VARCHAR},
+      create_time = #{createTime,jdbcType=TIMESTAMP},
+      update_time = #{updateTime,jdbcType=TIMESTAMP}
+    where id = #{id,jdbcType=INTEGER}
+  </update>
+</mapper>

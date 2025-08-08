@@ -1,0 +1,208 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="com.core.manycloudcommon.mapper.CommissionDetailMapper" >
+  <resultMap id="BaseResultMap" type="com.core.manycloudcommon.entity.CommissionDetail" >
+    <id column="id" property="id" jdbcType="INTEGER" />
+    <result column="user_id" property="userId" jdbcType="VARCHAR" />
+    <result column="medal_id" property="medalId" jdbcType="INTEGER" />
+    <result column="low_user_id" property="lowUserId" jdbcType="VARCHAR" />
+    <result column="level_id" property="levelId" jdbcType="INTEGER" />
+    <result column="type" property="type" jdbcType="INTEGER" />
+    <result column="product_no" property="productNo" jdbcType="VARCHAR" />
+    <result column="consumption" property="consumption" jdbcType="DECIMAL" />
+    <result column="commission" property="commission" jdbcType="DECIMAL" />
+    <result column="ratio" property="ratio" jdbcType="DECIMAL" />
+    <result column="create_time" property="createTime" jdbcType="TIMESTAMP" />
+    <result column="update_time" property="updateTime" jdbcType="TIMESTAMP" />
+  </resultMap>
+  <sql id="Base_Column_List" >
+    id, user_id, medal_id, low_user_id, level_id, type, product_no, consumption, commission, 
+    ratio, create_time, update_time
+  </sql>
+  <select id="selectByPrimaryKey" resultMap="BaseResultMap" parameterType="java.lang.Integer" >
+    select 
+    <include refid="Base_Column_List" />
+    from t_commission_detail
+    where id = #{id,jdbcType=INTEGER}
+  </select>
+  <delete id="deleteByPrimaryKey" parameterType="java.lang.Integer" >
+    delete from t_commission_detail
+    where id = #{id,jdbcType=INTEGER}
+  </delete>
+  <insert id="insert" parameterType="com.core.manycloudcommon.entity.CommissionDetail" >
+    <selectKey resultType="java.lang.Integer" keyProperty="id" order="AFTER" >
+      SELECT LAST_INSERT_ID()
+    </selectKey>
+    insert into t_commission_detail (user_id, medal_id, low_user_id, 
+      level_id, type, product_no, 
+      consumption, commission, ratio, 
+      create_time, update_time)
+    values (#{userId,jdbcType=VARCHAR}, #{medalId,jdbcType=INTEGER}, #{lowUserId,jdbcType=VARCHAR}, 
+      #{levelId,jdbcType=INTEGER}, #{type,jdbcType=INTEGER}, #{productNo,jdbcType=VARCHAR}, 
+      #{consumption,jdbcType=DECIMAL}, #{commission,jdbcType=DECIMAL}, #{ratio,jdbcType=DECIMAL}, 
+      #{createTime,jdbcType=TIMESTAMP}, #{updateTime,jdbcType=TIMESTAMP})
+  </insert>
+  <insert id="insertSelective" parameterType="com.core.manycloudcommon.entity.CommissionDetail" >
+    <selectKey resultType="java.lang.Integer" keyProperty="id" order="AFTER" >
+      SELECT LAST_INSERT_ID()
+    </selectKey>
+    insert into t_commission_detail
+    <trim prefix="(" suffix=")" suffixOverrides="," >
+      <if test="userId != null" >
+        user_id,
+      </if>
+      <if test="medalId != null" >
+        medal_id,
+      </if>
+      <if test="lowUserId != null" >
+        low_user_id,
+      </if>
+      <if test="levelId != null" >
+        level_id,
+      </if>
+      <if test="type != null" >
+        type,
+      </if>
+      <if test="productNo != null" >
+        product_no,
+      </if>
+      <if test="consumption != null" >
+        consumption,
+      </if>
+      <if test="commission != null" >
+        commission,
+      </if>
+      <if test="ratio != null" >
+        ratio,
+      </if>
+      <if test="createTime != null" >
+        create_time,
+      </if>
+      <if test="updateTime != null" >
+        update_time,
+      </if>
+    </trim>
+    <trim prefix="values (" suffix=")" suffixOverrides="," >
+      <if test="userId != null" >
+        #{userId,jdbcType=VARCHAR},
+      </if>
+      <if test="medalId != null" >
+        #{medalId,jdbcType=INTEGER},
+      </if>
+      <if test="lowUserId != null" >
+        #{lowUserId,jdbcType=VARCHAR},
+      </if>
+      <if test="levelId != null" >
+        #{levelId,jdbcType=INTEGER},
+      </if>
+      <if test="type != null" >
+        #{type,jdbcType=INTEGER},
+      </if>
+      <if test="productNo != null" >
+        #{productNo,jdbcType=VARCHAR},
+      </if>
+      <if test="consumption != null" >
+        #{consumption,jdbcType=DECIMAL},
+      </if>
+      <if test="commission != null" >
+        #{commission,jdbcType=DECIMAL},
+      </if>
+      <if test="ratio != null" >
+        #{ratio,jdbcType=DECIMAL},
+      </if>
+      <if test="createTime != null" >
+        #{createTime,jdbcType=TIMESTAMP},
+      </if>
+      <if test="updateTime != null" >
+        #{updateTime,jdbcType=TIMESTAMP},
+      </if>
+    </trim>
+  </insert>
+  <update id="updateByPrimaryKeySelective" parameterType="com.core.manycloudcommon.entity.CommissionDetail" >
+    update t_commission_detail
+    <set >
+      <if test="userId != null" >
+        user_id = #{userId,jdbcType=VARCHAR},
+      </if>
+      <if test="medalId != null" >
+        medal_id = #{medalId,jdbcType=INTEGER},
+      </if>
+      <if test="lowUserId != null" >
+        low_user_id = #{lowUserId,jdbcType=VARCHAR},
+      </if>
+      <if test="levelId != null" >
+        level_id = #{levelId,jdbcType=INTEGER},
+      </if>
+      <if test="type != null" >
+        type = #{type,jdbcType=INTEGER},
+      </if>
+      <if test="productNo != null" >
+        product_no = #{productNo,jdbcType=VARCHAR},
+      </if>
+      <if test="consumption != null" >
+        consumption = #{consumption,jdbcType=DECIMAL},
+      </if>
+      <if test="commission != null" >
+        commission = #{commission,jdbcType=DECIMAL},
+      </if>
+      <if test="ratio != null" >
+        ratio = #{ratio,jdbcType=DECIMAL},
+      </if>
+      <if test="createTime != null" >
+        create_time = #{createTime,jdbcType=TIMESTAMP},
+      </if>
+      <if test="updateTime != null" >
+        update_time = #{updateTime,jdbcType=TIMESTAMP},
+      </if>
+    </set>
+    where id = #{id,jdbcType=INTEGER}
+  </update>
+  <update id="updateByPrimaryKey" parameterType="com.core.manycloudcommon.entity.CommissionDetail" >
+    update t_commission_detail
+    set user_id = #{userId,jdbcType=VARCHAR},
+      medal_id = #{medalId,jdbcType=INTEGER},
+      low_user_id = #{lowUserId,jdbcType=VARCHAR},
+      level_id = #{levelId,jdbcType=INTEGER},
+      type = #{type,jdbcType=INTEGER},
+      product_no = #{productNo,jdbcType=VARCHAR},
+      consumption = #{consumption,jdbcType=DECIMAL},
+      commission = #{commission,jdbcType=DECIMAL},
+      ratio = #{ratio,jdbcType=DECIMAL},
+      create_time = #{createTime,jdbcType=TIMESTAMP},
+      update_time = #{updateTime,jdbcType=TIMESTAMP}
+    where id = #{id,jdbcType=INTEGER}
+  </update>
+
+
+  <select id="selectStatisticsByUser" resultType="com.core.manycloudcommon.vo.finance.QueryCommissionStatisticsVO"  parameterType="java.lang.String">
+    select
+      IFNULL(sum(consumption),0.0)as consumptionTotal,
+      IFNULL(sum(commission),0.0)as commissionTotal
+    from
+      t_commission_detail
+    where
+      user_id = #{userId,jdbcType=VARCHAR}
+  </select>
+
+  <select id="selectList" resultType="com.core.manycloudcommon.vo.finance.QueryCommissionDetailListVO" parameterType="java.util.Map">
+    select
+    u.email,u.nick_name as name,c.create_time as createTime,c.consumption,c.commission,c.ratio
+    from
+    t_commission_detail as c
+    left join
+    t_user_info as u on u.user_id = c.low_user_id
+    where
+    c.user_id = #{userId,jdbcType=VARCHAR}
+    <if test="account != null" >
+      and (u.phone = #{account,jdbcType=VARCHAR} or u.email = #{account,jdbcType=VARCHAR})
+    </if>
+    <if test="startTime != null" >
+      and c.create_time > #{startTime,jdbcType=VARCHAR}
+    </if>
+    <if test="endTime != null" >
+      and  #{endTime,jdbcType=VARCHAR} > c.create_time
+    </if>
+    order by c.id desc
+  </select>
+
+</mapper>

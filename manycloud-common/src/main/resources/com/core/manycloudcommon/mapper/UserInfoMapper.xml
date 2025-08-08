@@ -1,0 +1,299 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="com.core.manycloudcommon.mapper.UserInfoMapper" >
+  <resultMap id="BaseResultMap" type="com.core.manycloudcommon.entity.UserInfo" >
+    <id column="id" property="id" jdbcType="INTEGER" />
+    <result column="user_id" property="userId" jdbcType="VARCHAR" />
+    <result column="account" property="account" jdbcType="VARCHAR" />
+    <result column="login_pwd" property="loginPwd" jdbcType="VARCHAR" />
+    <result column="nick_name" property="nickName" jdbcType="VARCHAR" />
+    <result column="phone" property="phone" jdbcType="VARCHAR" />
+    <result column="email" property="email" jdbcType="VARCHAR" />
+    <result column="market" property="market" jdbcType="VARCHAR" />
+    <result column="type" property="type" jdbcType="INTEGER" />
+    <result column="status" property="status" jdbcType="INTEGER" />
+    <result column="login_limit" property="loginLimit" jdbcType="INTEGER" />
+    <result column="login_time" property="loginTime" jdbcType="TIMESTAMP" />
+    <result column="remark" property="remark" jdbcType="VARCHAR" />
+    <result column="create_time" property="createTime" jdbcType="TIMESTAMP" />
+    <result column="update_time" property="updateTime" jdbcType="TIMESTAMP" />
+    <result column="login_ip" property="loginIp" jdbcType="VARCHAR" />
+  </resultMap>
+  <sql id="Base_Column_List" >
+    id, user_id, account, login_pwd, nick_name, phone, email, market, type, status, login_limit, 
+    login_time, remark, create_time, update_time,login_ip
+  </sql>
+  <select id="selectByPrimaryKey" resultMap="BaseResultMap" parameterType="java.lang.Integer" >
+    select 
+    <include refid="Base_Column_List" />
+    from t_user_info
+    where id = #{id,jdbcType=INTEGER}
+  </select>
+
+  <select id="selectById" resultMap="BaseResultMap" parameterType="java.lang.String" >
+    select
+    <include refid="Base_Column_List" />
+    from t_user_info
+    where user_id = #{userId,jdbcType=VARCHAR}
+
+  </select>
+
+  <select id="selectByAccount" resultMap="BaseResultMap" parameterType="java.lang.String" >
+    select
+    <include refid="Base_Column_List" />
+    from t_user_info
+    where email = #{account,jdbcType=VARCHAR} or account = #{account,jdbcType=VARCHAR}
+  </select>
+
+  <select id="selectSaleByType" resultType="com.core.manycloudcommon.vo.user.UserSelectVO">
+    select
+     user_id as userId,CONCAT(nick_name, '-', account) as account
+    from t_user_info
+    where type = 2 or type = 3
+  </select>
+
+
+  <select id="selectByMarket" resultMap="BaseResultMap" parameterType="java.lang.String" >
+    select
+    <include refid="Base_Column_List" />
+    from t_user_info
+    where market = #{market,jdbcType=VARCHAR}
+  </select>
+
+  <delete id="deleteByPrimaryKey" parameterType="java.lang.Integer" >
+    delete from t_user_info
+    where id = #{id,jdbcType=INTEGER}
+  </delete>
+  <insert id="insert" parameterType="com.core.manycloudcommon.entity.UserInfo" >
+    <selectKey resultType="java.lang.Integer" keyProperty="id" order="AFTER" >
+      SELECT LAST_INSERT_ID()
+    </selectKey>
+    insert into t_user_info (user_id, account, login_pwd, 
+      nick_name, phone, email, 
+      market, type, status, 
+      login_limit, login_time, remark, 
+      create_time, update_time,login_ip)
+    values (#{userId,jdbcType=VARCHAR}, #{account,jdbcType=VARCHAR}, #{loginPwd,jdbcType=VARCHAR}, 
+      #{nickName,jdbcType=VARCHAR}, #{phone,jdbcType=VARCHAR}, #{email,jdbcType=VARCHAR}, 
+      #{market,jdbcType=VARCHAR}, #{type,jdbcType=INTEGER}, #{status,jdbcType=INTEGER}, 
+      #{loginLimit,jdbcType=INTEGER}, #{loginTime,jdbcType=TIMESTAMP}, #{remark,jdbcType=VARCHAR}, 
+      #{createTime,jdbcType=TIMESTAMP}, #{updateTime,jdbcType=TIMESTAMP},#{loginIp,jdbcType=VARCHAR})
+  </insert>
+  <insert id="insertSelective" parameterType="com.core.manycloudcommon.entity.UserInfo" >
+    <selectKey resultType="java.lang.Integer" keyProperty="id" order="AFTER" >
+      SELECT LAST_INSERT_ID()
+    </selectKey>
+    insert into t_user_info
+    <trim prefix="(" suffix=")" suffixOverrides="," >
+      <if test="userId != null" >
+        user_id,
+      </if>
+      <if test="account != null" >
+        account,
+      </if>
+      <if test="loginPwd != null" >
+        login_pwd,
+      </if>
+      <if test="nickName != null" >
+        nick_name,
+      </if>
+      <if test="phone != null" >
+        phone,
+      </if>
+      <if test="email != null" >
+        email,
+      </if>
+      <if test="market != null" >
+        market,
+      </if>
+      <if test="type != null" >
+        type,
+      </if>
+      <if test="status != null" >
+        status,
+      </if>
+      <if test="loginLimit != null" >
+        login_limit,
+      </if>
+      <if test="loginTime != null" >
+        login_time,
+      </if>
+      <if test="remark != null" >
+        remark,
+      </if>
+      <if test="createTime != null" >
+        create_time,
+      </if>
+      <if test="updateTime != null" >
+        update_time,
+      </if>
+      <if test="loginIp != null" >
+        login_ip,
+      </if>
+    </trim>
+    <trim prefix="values (" suffix=")" suffixOverrides="," >
+      <if test="userId != null" >
+        #{userId,jdbcType=VARCHAR},
+      </if>
+      <if test="account != null" >
+        #{account,jdbcType=VARCHAR},
+      </if>
+      <if test="loginPwd != null" >
+        #{loginPwd,jdbcType=VARCHAR},
+      </if>
+      <if test="nickName != null" >
+        #{nickName,jdbcType=VARCHAR},
+      </if>
+      <if test="phone != null" >
+        #{phone,jdbcType=VARCHAR},
+      </if>
+      <if test="email != null" >
+        #{email,jdbcType=VARCHAR},
+      </if>
+      <if test="market != null" >
+        #{market,jdbcType=VARCHAR},
+      </if>
+      <if test="type != null" >
+        #{type,jdbcType=INTEGER},
+      </if>
+      <if test="status != null" >
+        #{status,jdbcType=INTEGER},
+      </if>
+      <if test="loginLimit != null" >
+        #{loginLimit,jdbcType=INTEGER},
+      </if>
+      <if test="loginTime != null" >
+        #{loginTime,jdbcType=TIMESTAMP},
+      </if>
+      <if test="remark != null" >
+        #{remark,jdbcType=VARCHAR},
+      </if>
+      <if test="createTime != null" >
+        #{createTime,jdbcType=TIMESTAMP},
+      </if>
+      <if test="updateTime != null" >
+        #{updateTime,jdbcType=TIMESTAMP},
+      </if>
+      <if test="loginIp != null" >
+        #{loginIp,jdbcType=VARCHAR},
+      </if>
+    </trim>
+  </insert>
+  <update id="updateByPrimaryKeySelective" parameterType="com.core.manycloudcommon.entity.UserInfo" >
+    update t_user_info
+    <set >
+      <if test="userId != null" >
+        user_id = #{userId,jdbcType=VARCHAR},
+      </if>
+      <if test="account != null" >
+        account = #{account,jdbcType=VARCHAR},
+      </if>
+      <if test="loginPwd != null" >
+        login_pwd = #{loginPwd,jdbcType=VARCHAR},
+      </if>
+      <if test="nickName != null" >
+        nick_name = #{nickName,jdbcType=VARCHAR},
+      </if>
+      <if test="phone != null" >
+        phone = #{phone,jdbcType=VARCHAR},
+      </if>
+      <if test="email != null" >
+        email = #{email,jdbcType=VARCHAR},
+      </if>
+      <if test="market != null" >
+        market = #{market,jdbcType=VARCHAR},
+      </if>
+      <if test="type != null" >
+        type = #{type,jdbcType=INTEGER},
+      </if>
+      <if test="status != null" >
+        status = #{status,jdbcType=INTEGER},
+      </if>
+      <if test="loginLimit != null" >
+        login_limit = #{loginLimit,jdbcType=INTEGER},
+      </if>
+      <if test="loginTime != null" >
+        login_time = #{loginTime,jdbcType=TIMESTAMP},
+      </if>
+      <if test="remark != null" >
+        remark = #{remark,jdbcType=VARCHAR},
+      </if>
+      <if test="createTime != null" >
+        create_time = #{createTime,jdbcType=TIMESTAMP},
+      </if>
+      <if test="updateTime != null" >
+        update_time = #{updateTime,jdbcType=TIMESTAMP},
+      </if>
+      <if test="loginIp != null" >
+        login_ip = #{loginIp,jdbcType=VARCHAR},
+      </if>
+    </set>
+    where id = #{id,jdbcType=INTEGER}
+  </update>
+  <update id="updateByPrimaryKey" parameterType="com.core.manycloudcommon.entity.UserInfo" >
+    update t_user_info
+    set user_id = #{userId,jdbcType=VARCHAR},
+      account = #{account,jdbcType=VARCHAR},
+      login_pwd = #{loginPwd,jdbcType=VARCHAR},
+      nick_name = #{nickName,jdbcType=VARCHAR},
+      phone = #{phone,jdbcType=VARCHAR},
+      email = #{email,jdbcType=VARCHAR},
+      market = #{market,jdbcType=VARCHAR},
+      type = #{type,jdbcType=INTEGER},
+      status = #{status,jdbcType=INTEGER},
+      login_limit = #{loginLimit,jdbcType=INTEGER},
+      login_time = #{loginTime,jdbcType=TIMESTAMP},
+      remark = #{remark,jdbcType=VARCHAR},
+      create_time = #{createTime,jdbcType=TIMESTAMP},
+      update_time = #{updateTime,jdbcType=TIMESTAMP},
+      login_ip = #{loginIp,jdbcType=VARCHAR}
+    where id = #{id,jdbcType=INTEGER}
+  </update>
+
+  <select id="selectList" resultType="com.core.manycloudcommon.vo.user.UserListVO">
+    select
+      u.user_id as userId,
+	  u.account,
+	  u.nick_name as nick,
+	  le.name as levelName,
+	  me.name as medalName,
+	  up.account as proAccount,
+	  uf.valid_num as balance,
+      u.remark,
+	  u.create_time as createTime
+    from
+        t_user_info as u
+    left join
+        t_user_level as e on e.user_id = u.user_id
+    left join
+        t_level_info as le on le.id = e.level_id
+    left join
+        t_user_medal as m on m.user_id = u.user_id
+    left join
+        t_medal_info as me on me.id = m.medal_id
+    left join
+        t_user_pro as p on p.user_id = u.user_id
+    left join
+        t_user_info as up on up.user_id = p.pro_user_id
+    left join
+        t_user_finance as uf on uf.user_id = u.user_id
+    where
+      1 = 1
+    <if test="account != null" >
+      and (u.email like '%${account}%' or u.account like '%${account}%')
+    </if>
+    <if test="nick != null" >
+      and u.nick_name like '%${nick}%'
+    </if>
+    <if test="startTime != null" >
+      and u.create_time >= #{startTime,jdbcType=VARCHAR}
+    </if>
+    <if test="endTime != null" >
+      and #{endTime,jdbcType=VARCHAR} >= u.create_time
+    </if>
+    order by u.id desc
+
+  </select>
+
+
+</mapper>

@@ -1,0 +1,292 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="com.core.manycloudcommon.mapper.FinanceDetailMapper" >
+  <resultMap id="BaseResultMap" type="com.core.manycloudcommon.entity.FinanceDetail" >
+    <id column="id" property="id" jdbcType="INTEGER" />
+    <result column="user_id" property="userId" jdbcType="VARCHAR" />
+    <result column="finance_no" property="financeNo" jdbcType="VARCHAR" />
+    <result column="product_no" property="productNo" jdbcType="VARCHAR" />
+    <result column="type" property="type" jdbcType="INTEGER" />
+    <result column="money_num" property="moneyNum" jdbcType="DECIMAL" />
+    <result column="period" property="period" jdbcType="INTEGER" />
+    <result column="tag" property="tag" jdbcType="VARCHAR" />
+    <result column="direction" property="direction" jdbcType="INTEGER" />
+    <result column="way" property="way" jdbcType="INTEGER" />
+    <result column="status" property="status" jdbcType="INTEGER" />
+    <result column="remarks" property="remarks" jdbcType="VARCHAR" />
+    <result column="create_time" property="createTime" jdbcType="TIMESTAMP" />
+    <result column="update_time" property="updateTime" jdbcType="TIMESTAMP" />
+  </resultMap>
+  <sql id="Base_Column_List" >
+    id, user_id, finance_no,product_no, type, money_num, period, tag, direction, way, status, remarks,
+    create_time, update_time
+  </sql>
+  <select id="selectByPrimaryKey" resultMap="BaseResultMap" parameterType="java.lang.Integer" >
+    select 
+    <include refid="Base_Column_List" />
+    from t_finance_detail
+    where id = #{id,jdbcType=INTEGER}
+  </select>
+
+  <select id="selectBuyByProduct" resultMap="BaseResultMap" parameterType="java.lang.String" >
+    select
+    <include refid="Base_Column_List" />
+    from t_finance_detail
+    where product_no = #{productNo,jdbcType=VARCHAR} and tag = 'buy'
+  </select>
+
+
+  <select id="selectProductByUser" resultMap="BaseResultMap" parameterType="java.lang.String" >
+    select
+    <include refid="Base_Column_List" />
+    from t_finance_detail
+    where
+      product_no = #{productNo,jdbcType=VARCHAR}
+    and
+      user_id = #{userId,jdbcType=VARCHAR}
+    and
+      status = 1
+    and
+      (tag = 'buy' or tag = 'renew')
+    order by id desc
+  </select>
+
+
+  <select id="selectConsumptionByUser" resultType="java.math.BigDecimal" parameterType="java.lang.String" >
+    select
+    IFNULL(sum(money_num),0.0)as totalNum
+    from t_finance_detail
+    where type = 1 and status = 1 and user_id =  #{userId,jdbcType=VARCHAR}
+  </select>
+
+
+  <select id="selectConsumptionByUsers" resultType="java.math.BigDecimal" parameterType="java.util.List" >
+    select
+    IFNULL(sum(money_num),0.0)as totalNum
+    from t_finance_detail
+    where
+      type = 1
+    and
+      status = 1
+    and
+      user_id in
+    <foreach item="item" collection="list" separator="," open="(" close=")">
+      #{item,jdbcType=VARCHAR}
+    </foreach>
+  </select>
+
+
+  <select id="selectList" resultType="com.core.manycloudcommon.vo.finance.FinanceDetailListVO">
+    select
+    f.id,
+    f.finance_no as financeNo,
+    f.direction,
+    f.tag,
+    f.money_num as moneyNum,
+    f.create_time as createTime,
+    u.email,
+    i.public_ip as ip,
+    i.instance_id as instanceId
+    from
+      t_finance_detail as f
+    left join
+      t_user_info as u on u.user_id =  f.user_id
+    left join
+      t_instance_info as i on i.instance_id = f.product_no
+    where
+      f.status = 1
+    <if test="userId != null" >
+      and f.user_id = #{userId,jdbcType=VARCHAR}
+    </if>
+    <if test="direction != null" >
+      and f.direction = #{direction,jdbcType=INTEGER}
+    </if>
+    <if test="tag != null" >
+      and f.tag = #{tag,jdbcType=VARCHAR}
+    </if>
+    <if test="startTime != null" >
+      and f.create_time >= #{startTime,jdbcType=VARCHAR}
+    </if>
+    <if test="endTime != null" >
+      and #{endTime,jdbcType=VARCHAR} >= f.create_time
+    </if>
+    <if test="productNo != null" >
+      and (f.product_no = #{productNo,jdbcType=VARCHAR} or i.public_ip = #{productNo,jdbcType=VARCHAR})
+    </if>
+    <if test="email != null" >
+      and u.email = #{email,jdbcType=VARCHAR}
+    </if>
+    order by f.create_time desc
+  </select>
+
+
+  <delete id="deleteByPrimaryKey" parameterType="java.lang.Integer" >
+    delete from t_finance_detail
+    where id = #{id,jdbcType=INTEGER}
+  </delete>
+  <insert id="insert" parameterType="com.core.manycloudcommon.entity.FinanceDetail" >
+    <selectKey resultType="java.lang.Integer" keyProperty="id" order="AFTER" >
+      SELECT LAST_INSERT_ID()
+    </selectKey>
+    insert into t_finance_detail (user_id, finance_no,product_no, type,
+      money_num, period, tag, 
+      direction, way, status, 
+      remarks, create_time, update_time
+      )
+    values (#{userId,jdbcType=VARCHAR}, #{financeNo,jdbcType=VARCHAR}, #{productNo,jdbcType=VARCHAR}, #{type,jdbcType=INTEGER},
+      #{moneyNum,jdbcType=DECIMAL}, #{period,jdbcType=INTEGER}, #{tag,jdbcType=VARCHAR}, 
+      #{direction,jdbcType=INTEGER}, #{way,jdbcType=INTEGER}, #{status,jdbcType=INTEGER}, 
+      #{remarks,jdbcType=VARCHAR}, #{createTime,jdbcType=TIMESTAMP}, #{updateTime,jdbcType=TIMESTAMP}
+      )
+  </insert>
+  <insert id="insertSelective" parameterType="com.core.manycloudcommon.entity.FinanceDetail" >
+    <selectKey resultType="java.lang.Integer" keyProperty="id" order="AFTER" >
+      SELECT LAST_INSERT_ID()
+    </selectKey>
+    insert into t_finance_detail
+    <trim prefix="(" suffix=")" suffixOverrides="," >
+      <if test="userId != null" >
+        user_id,
+      </if>
+      <if test="financeNo != null" >
+        finance_no,
+      </if>
+      <if test="productNo != null" >
+        product_no,
+      </if>
+      <if test="type != null" >
+        type,
+      </if>
+      <if test="moneyNum != null" >
+        money_num,
+      </if>
+      <if test="period != null" >
+        period,
+      </if>
+      <if test="tag != null" >
+        tag,
+      </if>
+      <if test="direction != null" >
+        direction,
+      </if>
+      <if test="way != null" >
+        way,
+      </if>
+      <if test="status != null" >
+        status,
+      </if>
+      <if test="remarks != null" >
+        remarks,
+      </if>
+      <if test="createTime != null" >
+        create_time,
+      </if>
+      <if test="updateTime != null" >
+        update_time,
+      </if>
+    </trim>
+    <trim prefix="values (" suffix=")" suffixOverrides="," >
+      <if test="userId != null" >
+        #{userId,jdbcType=VARCHAR},
+      </if>
+      <if test="financeNo != null" >
+        #{financeNo,jdbcType=VARCHAR},
+      </if>
+      <if test="productNo != null" >
+        #{productNo,jdbcType=VARCHAR},
+      </if>
+      <if test="type != null" >
+        #{type,jdbcType=INTEGER},
+      </if>
+      <if test="moneyNum != null" >
+        #{moneyNum,jdbcType=DECIMAL},
+      </if>
+      <if test="period != null" >
+        #{period,jdbcType=INTEGER},
+      </if>
+      <if test="tag != null" >
+        #{tag,jdbcType=VARCHAR},
+      </if>
+      <if test="direction != null" >
+        #{direction,jdbcType=INTEGER},
+      </if>
+      <if test="way != null" >
+        #{way,jdbcType=INTEGER},
+      </if>
+      <if test="status != null" >
+        #{status,jdbcType=INTEGER},
+      </if>
+      <if test="remarks != null" >
+        #{remarks,jdbcType=VARCHAR},
+      </if>
+      <if test="createTime != null" >
+        #{createTime,jdbcType=TIMESTAMP},
+      </if>
+      <if test="updateTime != null" >
+        #{updateTime,jdbcType=TIMESTAMP},
+      </if>
+    </trim>
+  </insert>
+  <update id="updateByPrimaryKeySelective" parameterType="com.core.manycloudcommon.entity.FinanceDetail" >
+    update t_finance_detail
+    <set >
+      <if test="userId != null" >
+        user_id = #{userId,jdbcType=VARCHAR},
+      </if>
+      <if test="financeNo != null" >
+        finance_no = #{financeNo,jdbcType=VARCHAR},
+      </if>
+      <if test="productNo != null" >
+        product_no = #{productNo,jdbcType=VARCHAR},
+      </if>
+      <if test="type != null" >
+        type = #{type,jdbcType=INTEGER},
+      </if>
+      <if test="moneyNum != null" >
+        money_num = #{moneyNum,jdbcType=DECIMAL},
+      </if>
+      <if test="period != null" >
+        period = #{period,jdbcType=INTEGER},
+      </if>
+      <if test="tag != null" >
+        tag = #{tag,jdbcType=VARCHAR},
+      </if>
+      <if test="direction != null" >
+        direction = #{direction,jdbcType=INTEGER},
+      </if>
+      <if test="way != null" >
+        way = #{way,jdbcType=INTEGER},
+      </if>
+      <if test="status != null" >
+        status = #{status,jdbcType=INTEGER},
+      </if>
+      <if test="remarks != null" >
+        remarks = #{remarks,jdbcType=VARCHAR},
+      </if>
+      <if test="createTime != null" >
+        create_time = #{createTime,jdbcType=TIMESTAMP},
+      </if>
+      <if test="updateTime != null" >
+        update_time = #{updateTime,jdbcType=TIMESTAMP},
+      </if>
+    </set>
+    where id = #{id,jdbcType=INTEGER}
+  </update>
+  <update id="updateByPrimaryKey" parameterType="com.core.manycloudcommon.entity.FinanceDetail" >
+    update t_finance_detail
+    set user_id = #{userId,jdbcType=VARCHAR},
+      finance_no = #{financeNo,jdbcType=VARCHAR},
+      product_no = #{productNo,jdbcType=VARCHAR},
+      type = #{type,jdbcType=INTEGER},
+      money_num = #{moneyNum,jdbcType=DECIMAL},
+      period = #{period,jdbcType=INTEGER},
+      tag = #{tag,jdbcType=VARCHAR},
+      direction = #{direction,jdbcType=INTEGER},
+      way = #{way,jdbcType=INTEGER},
+      status = #{status,jdbcType=INTEGER},
+      remarks = #{remarks,jdbcType=VARCHAR},
+      create_time = #{createTime,jdbcType=TIMESTAMP},
+      update_time = #{updateTime,jdbcType=TIMESTAMP}
+    where id = #{id,jdbcType=INTEGER}
+  </update>
+</mapper>

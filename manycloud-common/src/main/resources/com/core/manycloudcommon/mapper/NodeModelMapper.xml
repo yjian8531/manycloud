@@ -1,0 +1,257 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="com.core.manycloudcommon.mapper.NodeModelMapper" >
+  <resultMap id="BaseResultMap" type="com.core.manycloudcommon.entity.NodeModel" >
+    <id column="id" property="id" jdbcType="INTEGER" />
+    <result column="node_id" property="nodeId" jdbcType="INTEGER" />
+    <result column="cpu_val" property="cpuVal" jdbcType="VARCHAR" />
+    <result column="ram_val" property="ramVal" jdbcType="VARCHAR" />
+    <result column="model_param" property="modelParam" jdbcType="VARCHAR" />
+    <result column="regular" property="regular" jdbcType="VARCHAR" />
+    <result column="remark" property="remark" jdbcType="VARCHAR" />
+    <result column="status" property="status" jdbcType="INTEGER" />
+    <result column="create_time" property="createTime" jdbcType="TIMESTAMP" />
+    <result column="update_time" property="updateTime" jdbcType="TIMESTAMP" />
+  </resultMap>
+  <sql id="Base_Column_List" >
+    id, node_id, cpu_val, ram_val, model_param, regular, remark, status, create_time, 
+    update_time
+  </sql>
+  <select id="selectByPrimaryKey" resultMap="BaseResultMap" parameterType="java.lang.Integer" >
+    select 
+    <include refid="Base_Column_List" />
+    from t_node_model
+    where id = #{id,jdbcType=INTEGER}
+  </select>
+
+
+  <select id="selectConfigByNodeId" resultType="com.core.manycloudcommon.vo.node.NodeModelConfigVO" parameterType="java.lang.Integer" >
+    select
+    id,CONCAT(cpu_val,'C', ram_val,'G') as config
+    from t_node_model
+    where node_id = #{nodeId,jdbcType=INTEGER}
+    order by cpu_val,ram_val
+  </select>
+
+  <select id="selectList" resultMap="BaseResultMap">
+    select
+    <include refid="Base_Column_List" />
+    from t_node_model
+    where
+    1 = 1
+    <if test="cpu != null" >
+      and cpu_val = #{cpu,jdbcType=VARCHAR}
+    </if>
+    <if test="ram != null" >
+      and ram_val = #{ram,jdbcType=VARCHAR}
+    </if>
+    <if test="nodeId != null" >
+      and node_id = #{nodeId,jdbcType=INTEGER}
+    </if>
+    <if test="status != null" >
+      and status = #{status,jdbcType=INTEGER}
+    </if>
+    order by id desc
+  </select>
+
+  <select id="selectByNode" resultMap="BaseResultMap" parameterType="java.lang.Integer" >
+    select
+    <include refid="Base_Column_List" />
+    from t_node_model
+    where node_id = #{nodeId,jdbcType=INTEGER} and status = 0
+    order by cpu_val
+  </select>
+
+  <select id="selectByConfig" resultMap="BaseResultMap">
+    select
+    <include refid="Base_Column_List" />
+    from t_node_model
+    where
+      node_id = #{nodeId,jdbcType=INTEGER}
+    and
+      cpu_val = #{cpu,jdbcType=VARCHAR}
+    and
+      ram_val = #{ram,jdbcType=VARCHAR}
+  </select>
+
+  <delete id="deleteByPrimaryKey" parameterType="java.lang.Integer" >
+    delete from t_node_model
+    where id = #{id,jdbcType=INTEGER}
+  </delete>
+  <insert id="insert" parameterType="com.core.manycloudcommon.entity.NodeModel" >
+    <selectKey resultType="java.lang.Integer" keyProperty="id" order="AFTER" >
+      SELECT LAST_INSERT_ID()
+    </selectKey>
+    insert into t_node_model (node_id, cpu_val, ram_val, 
+      model_param, regular, remark, 
+      status, create_time, update_time
+      )
+    values (#{nodeId,jdbcType=INTEGER}, #{cpuVal,jdbcType=VARCHAR}, #{ramVal,jdbcType=VARCHAR}, 
+      #{modelParam,jdbcType=VARCHAR}, #{regular,jdbcType=VARCHAR}, #{remark,jdbcType=VARCHAR}, 
+      #{status,jdbcType=INTEGER}, #{createTime,jdbcType=TIMESTAMP}, #{updateTime,jdbcType=TIMESTAMP}
+      )
+  </insert>
+  <insert id="insertSelective" parameterType="com.core.manycloudcommon.entity.NodeModel" >
+    <selectKey resultType="java.lang.Integer" keyProperty="id" order="AFTER" >
+      SELECT LAST_INSERT_ID()
+    </selectKey>
+    insert into t_node_model
+    <trim prefix="(" suffix=")" suffixOverrides="," >
+      <if test="nodeId != null" >
+        node_id,
+      </if>
+      <if test="cpuVal != null" >
+        cpu_val,
+      </if>
+      <if test="ramVal != null" >
+        ram_val,
+      </if>
+      <if test="modelParam != null" >
+        model_param,
+      </if>
+      <if test="regular != null" >
+        regular,
+      </if>
+      <if test="remark != null" >
+        remark,
+      </if>
+      <if test="status != null" >
+        status,
+      </if>
+      <if test="createTime != null" >
+        create_time,
+      </if>
+      <if test="updateTime != null" >
+        update_time,
+      </if>
+    </trim>
+    <trim prefix="values (" suffix=")" suffixOverrides="," >
+      <if test="nodeId != null" >
+        #{nodeId,jdbcType=INTEGER},
+      </if>
+      <if test="cpuVal != null" >
+        #{cpuVal,jdbcType=VARCHAR},
+      </if>
+      <if test="ramVal != null" >
+        #{ramVal,jdbcType=VARCHAR},
+      </if>
+      <if test="modelParam != null" >
+        #{modelParam,jdbcType=VARCHAR},
+      </if>
+      <if test="regular != null" >
+        #{regular,jdbcType=VARCHAR},
+      </if>
+      <if test="remark != null" >
+        #{remark,jdbcType=VARCHAR},
+      </if>
+      <if test="status != null" >
+        #{status,jdbcType=INTEGER},
+      </if>
+      <if test="createTime != null" >
+        #{createTime,jdbcType=TIMESTAMP},
+      </if>
+      <if test="updateTime != null" >
+        #{updateTime,jdbcType=TIMESTAMP},
+      </if>
+    </trim>
+  </insert>
+  <update id="updateByPrimaryKeySelective" parameterType="com.core.manycloudcommon.entity.NodeModel" >
+    update t_node_model
+    <set >
+      <if test="nodeId != null" >
+        node_id = #{nodeId,jdbcType=INTEGER},
+      </if>
+      <if test="cpuVal != null" >
+        cpu_val = #{cpuVal,jdbcType=VARCHAR},
+      </if>
+      <if test="ramVal != null" >
+        ram_val = #{ramVal,jdbcType=VARCHAR},
+      </if>
+      <if test="modelParam != null" >
+        model_param = #{modelParam,jdbcType=VARCHAR},
+      </if>
+      <if test="regular != null" >
+        regular = #{regular,jdbcType=VARCHAR},
+      </if>
+      <if test="remark != null" >
+        remark = #{remark,jdbcType=VARCHAR},
+      </if>
+      <if test="status != null" >
+        status = #{status,jdbcType=INTEGER},
+      </if>
+      <if test="createTime != null" >
+        create_time = #{createTime,jdbcType=TIMESTAMP},
+      </if>
+      <if test="updateTime != null" >
+        update_time = #{updateTime,jdbcType=TIMESTAMP},
+      </if>
+    </set>
+    where id = #{id,jdbcType=INTEGER}
+  </update>
+  <update id="updateByPrimaryKey" parameterType="com.core.manycloudcommon.entity.NodeModel" >
+    update t_node_model
+    set node_id = #{nodeId,jdbcType=INTEGER},
+      cpu_val = #{cpuVal,jdbcType=VARCHAR},
+      ram_val = #{ramVal,jdbcType=VARCHAR},
+      model_param = #{modelParam,jdbcType=VARCHAR},
+      regular = #{regular,jdbcType=VARCHAR},
+      remark = #{remark,jdbcType=VARCHAR},
+      status = #{status,jdbcType=INTEGER},
+      create_time = #{createTime,jdbcType=TIMESTAMP},
+      update_time = #{updateTime,jdbcType=TIMESTAMP}
+    where id = #{id,jdbcType=INTEGER}
+  </update>
+
+  <select id="selectProductDetail" resultType="com.core.manycloudcommon.vo.main.QueryProductDetailVO">
+    select
+	    n.id as nodeId,
+	    rc.country_name as countryName,
+	    rp.province_name as provinceName,
+        cy.id as cityId,
+        cy.city_name as cityName,
+	    n.node_name as nodeName,
+	    nm.cpu_val as cpu,
+	    nm.ram_val as ram,
+	    nm.id as modelId,
+	    nm.regular,
+	    IFNULL(np.price,0.0)as modelPrice
+	from
+	    t_node_model as nm
+	left join
+	    t_node_info as n on n.id = nm.node_id
+	left join
+		t_region_province as rp on rp.id = n.province_id
+	left join
+		t_region_country as rc on rc.id = n.country_id
+    left join
+        t_region_city as cy on cy.id = n.city_id
+	left join
+		t_node_price as np on np.node_id = nm.node_id and np.period = 1 and np.config_id = nm.id and np.config_type = 'model'
+	where
+      n.status = 0
+    <if test="list != null" >
+      and n.id in
+      <foreach item="item" collection="list" separator="," open="(" close=")">
+        #{item,jdbcType=INTEGER}
+      </foreach>
+    </if>
+
+    <if test="sort == 0">
+      order by n.sorting
+    </if>
+    <if test="sort == 1">
+      order by nm.cpu_val
+    </if>
+    <if test="sort == 2">
+      order by nm.cpu_val desc
+    </if>
+    <if test="sort == 3">
+      order by nm.ram_val
+    </if>
+    <if test="sort == 4">
+      order by nm.ram_val desc
+    </if>
+
+  </select>
+
+</mapper>

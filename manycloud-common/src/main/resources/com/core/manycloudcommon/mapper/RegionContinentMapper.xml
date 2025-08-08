@@ -1,0 +1,149 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="com.core.manycloudcommon.mapper.RegionContinentMapper" >
+  <resultMap id="BaseResultMap" type="com.core.manycloudcommon.entity.RegionContinent" >
+    <id column="id" property="id" jdbcType="INTEGER" />
+    <result column="continent_name" property="continentName" jdbcType="VARCHAR" />
+    <result column="sorting" property="sorting" jdbcType="INTEGER" />
+    <result column="remark" property="remark" jdbcType="VARCHAR" />
+    <result column="status" property="status" jdbcType="INTEGER" />
+    <result column="create_time" property="createTime" jdbcType="TIMESTAMP" />
+    <result column="update_time" property="updateTime" jdbcType="TIMESTAMP" />
+  </resultMap>
+  <sql id="Base_Column_List" >
+    id, continent_name, sorting, remark, status, create_time, update_time
+  </sql>
+  <select id="selectByPrimaryKey" resultMap="BaseResultMap" parameterType="java.lang.Integer" >
+    select 
+    <include refid="Base_Column_List" />
+    from t_region_continent
+    where id = #{id,jdbcType=INTEGER}
+  </select>
+
+  <select id="selectValid" resultMap="BaseResultMap">
+    select
+    <include refid="Base_Column_List" />
+    from t_region_continent
+    where status = 0
+    order by sorting
+  </select>
+
+
+  <select id="selectAll" resultMap="BaseResultMap">
+    select
+    <include refid="Base_Column_List" />
+    from t_region_continent
+    order by id desc
+  </select>
+
+  <select id="selectList" resultMap="BaseResultMap">
+    select
+    <include refid="Base_Column_List" />
+    from t_region_continent
+    where
+      1 = 1
+    <if test="continentName != null" >
+      and continent_name like '%${continentName}%'
+    </if>
+    <if test="status != null" >
+      and status = #{status,jdbcType=INTEGER}
+    </if>
+    order by id desc
+  </select>
+
+  <delete id="deleteByPrimaryKey" parameterType="java.lang.Integer" >
+    delete from t_region_continent
+    where id = #{id,jdbcType=INTEGER}
+  </delete>
+  <insert id="insert" parameterType="com.core.manycloudcommon.entity.RegionContinent" >
+    <selectKey resultType="java.lang.Integer" keyProperty="id" order="AFTER" >
+      SELECT LAST_INSERT_ID()
+    </selectKey>
+    insert into t_region_continent (continent_name, sorting, remark, 
+      status, create_time, update_time
+      )
+    values (#{continentName,jdbcType=VARCHAR}, #{sorting,jdbcType=INTEGER}, #{remark,jdbcType=VARCHAR}, 
+      #{status,jdbcType=INTEGER}, #{createTime,jdbcType=TIMESTAMP}, #{updateTime,jdbcType=TIMESTAMP}
+      )
+  </insert>
+  <insert id="insertSelective" parameterType="com.core.manycloudcommon.entity.RegionContinent" >
+    <selectKey resultType="java.lang.Integer" keyProperty="id" order="AFTER" >
+      SELECT LAST_INSERT_ID()
+    </selectKey>
+    insert into t_region_continent
+    <trim prefix="(" suffix=")" suffixOverrides="," >
+      <if test="continentName != null" >
+        continent_name,
+      </if>
+      <if test="sorting != null" >
+        sorting,
+      </if>
+      <if test="remark != null" >
+        remark,
+      </if>
+      <if test="status != null" >
+        status,
+      </if>
+      <if test="createTime != null" >
+        create_time,
+      </if>
+      <if test="updateTime != null" >
+        update_time,
+      </if>
+    </trim>
+    <trim prefix="values (" suffix=")" suffixOverrides="," >
+      <if test="continentName != null" >
+        #{continentName,jdbcType=VARCHAR},
+      </if>
+      <if test="sorting != null" >
+        #{sorting,jdbcType=INTEGER},
+      </if>
+      <if test="remark != null" >
+        #{remark,jdbcType=VARCHAR},
+      </if>
+      <if test="status != null" >
+        #{status,jdbcType=INTEGER},
+      </if>
+      <if test="createTime != null" >
+        #{createTime,jdbcType=TIMESTAMP},
+      </if>
+      <if test="updateTime != null" >
+        #{updateTime,jdbcType=TIMESTAMP},
+      </if>
+    </trim>
+  </insert>
+  <update id="updateByPrimaryKeySelective" parameterType="com.core.manycloudcommon.entity.RegionContinent" >
+    update t_region_continent
+    <set >
+      <if test="continentName != null" >
+        continent_name = #{continentName,jdbcType=VARCHAR},
+      </if>
+      <if test="sorting != null" >
+        sorting = #{sorting,jdbcType=INTEGER},
+      </if>
+      <if test="remark != null" >
+        remark = #{remark,jdbcType=VARCHAR},
+      </if>
+      <if test="status != null" >
+        status = #{status,jdbcType=INTEGER},
+      </if>
+      <if test="createTime != null" >
+        create_time = #{createTime,jdbcType=TIMESTAMP},
+      </if>
+      <if test="updateTime != null" >
+        update_time = #{updateTime,jdbcType=TIMESTAMP},
+      </if>
+    </set>
+    where id = #{id,jdbcType=INTEGER}
+  </update>
+  <update id="updateByPrimaryKey" parameterType="com.core.manycloudcommon.entity.RegionContinent" >
+    update t_region_continent
+    set continent_name = #{continentName,jdbcType=VARCHAR},
+      sorting = #{sorting,jdbcType=INTEGER},
+      remark = #{remark,jdbcType=VARCHAR},
+      status = #{status,jdbcType=INTEGER},
+      create_time = #{createTime,jdbcType=TIMESTAMP},
+      update_time = #{updateTime,jdbcType=TIMESTAMP}
+    where id = #{id,jdbcType=INTEGER}
+  </update>
+</mapper>

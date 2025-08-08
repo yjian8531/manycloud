@@ -1,0 +1,189 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.core.manycloudcommon.mapper.NodeAttributeMapper">
+  <resultMap id="BaseResultMap" type="com.core.manycloudcommon.entity.NodeAttribute">
+    <id column="id" jdbcType="INTEGER" property="id" />
+    <result column="node_id" jdbcType="INTEGER" property="nodeId" />
+    <result column="attribute_id" jdbcType="INTEGER" property="attributeId" />
+    <result column="param_str" jdbcType="VARCHAR" property="paramStr" />
+    <result column="status" jdbcType="INTEGER" property="status" />
+    <result column="create_time" jdbcType="TIMESTAMP" property="createTime" />
+    <result column="update_time" jdbcType="TIMESTAMP" property="updateTime" />
+  </resultMap>
+  <sql id="Base_Column_List">
+    id, node_id, attribute_id, param_str, status, create_time, update_time
+  </sql>
+  <select id="selectByPrimaryKey" parameterType="java.lang.Integer" resultMap="BaseResultMap">
+    select 
+    <include refid="Base_Column_List" />
+    from t_node_attribute
+    where id = #{id,jdbcType=INTEGER}
+  </select>
+
+  <select id="selectNodeByAttributeId" resultType="com.core.manycloudcommon.vo.admin.NodeAttributeBdVO">
+    select
+      na.id,
+      na.node_id as nodeId,
+      na.attribute_id as attributeId,
+      n.node_name as nodeName,
+      'Y' as tad
+    from
+      t_node_attribute as na
+    left join
+      t_node_info as n on n.id = na.node_id
+    where
+      na.attribute_id = #{attributeId,jdbcType=INTEGER}
+    <if test="label != null">
+      and n.label = #{label,jdbcType=VARCHAR}
+    </if>
+
+  </select>
+
+
+  <select id="selectByAttributeIds" resultType="java.lang.Integer">
+    select t.node_id from (
+      select
+      node_id,count(1)as num
+      from
+      t_node_attribute
+      where
+      attribute_id in
+    <foreach item="item" collection="list" separator="," open="(" close=")">
+      #{item,jdbcType=INTEGER}
+    </foreach>
+      group by node_id
+    ) as t
+    where
+    t.num >= #{size,jdbcType=INTEGER}
+
+  </select>
+
+  <delete id="deleteByPrimaryKey" parameterType="java.lang.Integer">
+    delete from t_node_attribute
+    where id = #{id,jdbcType=INTEGER}
+  </delete>
+
+  <delete id="deleteByAttributeId" parameterType="java.lang.Integer">
+    delete from t_node_attribute
+    where attribute_id = #{attributeId,jdbcType=INTEGER}
+  </delete>
+
+  <delete id="deleteByIds" parameterType="java.util.List">
+    delete from t_node_attribute
+    where id in
+    <foreach item="item" collection="list" separator="," open="(" close=")">
+      #{item,jdbcType=INTEGER}
+    </foreach>
+
+  </delete>
+
+  <insert id="insert" parameterType="com.core.manycloudcommon.entity.NodeAttribute">
+    <selectKey keyProperty="id" order="AFTER" resultType="java.lang.Integer">
+      SELECT LAST_INSERT_ID()
+    </selectKey>
+    insert into t_node_attribute (node_id, attribute_id, param_str, 
+      status, create_time, update_time
+      )
+    values (#{nodeId,jdbcType=INTEGER}, #{attributeId,jdbcType=INTEGER}, #{paramStr,jdbcType=VARCHAR}, 
+      #{status,jdbcType=INTEGER}, #{createTime,jdbcType=TIMESTAMP}, #{updateTime,jdbcType=TIMESTAMP}
+      )
+  </insert>
+
+  <insert id="insertList" parameterType="java.util.List">
+    <selectKey keyProperty="id" order="AFTER" resultType="java.lang.Integer">
+      SELECT LAST_INSERT_ID()
+    </selectKey>
+    insert into t_node_attribute (node_id, attribute_id, param_str,
+    status, create_time, update_time
+    )
+    value
+    <foreach item="item" collection="list" separator=",">
+      (#{item.nodeId,jdbcType=INTEGER}, #{item.attributeId,jdbcType=INTEGER}, #{item.paramStr,jdbcType=VARCHAR},
+      #{item.status,jdbcType=INTEGER}, #{item.createTime,jdbcType=TIMESTAMP}, #{item.updateTime,jdbcType=TIMESTAMP}
+      )
+    </foreach>
+  </insert>
+
+
+  <insert id="insertSelective" parameterType="com.core.manycloudcommon.entity.NodeAttribute">
+    <selectKey keyProperty="id" order="AFTER" resultType="java.lang.Integer">
+      SELECT LAST_INSERT_ID()
+    </selectKey>
+    insert into t_node_attribute
+    <trim prefix="(" suffix=")" suffixOverrides=",">
+      <if test="nodeId != null">
+        node_id,
+      </if>
+      <if test="attributeId != null">
+        attribute_id,
+      </if>
+      <if test="paramStr != null">
+        param_str,
+      </if>
+      <if test="status != null">
+        status,
+      </if>
+      <if test="createTime != null">
+        create_time,
+      </if>
+      <if test="updateTime != null">
+        update_time,
+      </if>
+    </trim>
+    <trim prefix="values (" suffix=")" suffixOverrides=",">
+      <if test="nodeId != null">
+        #{nodeId,jdbcType=INTEGER},
+      </if>
+      <if test="attributeId != null">
+        #{attributeId,jdbcType=INTEGER},
+      </if>
+      <if test="paramStr != null">
+        #{paramStr,jdbcType=VARCHAR},
+      </if>
+      <if test="status != null">
+        #{status,jdbcType=INTEGER},
+      </if>
+      <if test="createTime != null">
+        #{createTime,jdbcType=TIMESTAMP},
+      </if>
+      <if test="updateTime != null">
+        #{updateTime,jdbcType=TIMESTAMP},
+      </if>
+    </trim>
+  </insert>
+  <update id="updateByPrimaryKeySelective" parameterType="com.core.manycloudcommon.entity.NodeAttribute">
+    update t_node_attribute
+    <set>
+      <if test="nodeId != null">
+        node_id = #{nodeId,jdbcType=INTEGER},
+      </if>
+      <if test="attributeId != null">
+        attribute_id = #{attributeId,jdbcType=INTEGER},
+      </if>
+      <if test="paramStr != null">
+        param_str = #{paramStr,jdbcType=VARCHAR},
+      </if>
+      <if test="status != null">
+        status = #{status,jdbcType=INTEGER},
+      </if>
+      <if test="createTime != null">
+        create_time = #{createTime,jdbcType=TIMESTAMP},
+      </if>
+      <if test="updateTime != null">
+        update_time = #{updateTime,jdbcType=TIMESTAMP},
+      </if>
+    </set>
+    where id = #{id,jdbcType=INTEGER}
+  </update>
+  <update id="updateByPrimaryKey" parameterType="com.core.manycloudcommon.entity.NodeAttribute">
+    update t_node_attribute
+    set node_id = #{nodeId,jdbcType=INTEGER},
+      attribute_id = #{attributeId,jdbcType=INTEGER},
+      param_str = #{paramStr,jdbcType=VARCHAR},
+      status = #{status,jdbcType=INTEGER},
+      create_time = #{createTime,jdbcType=TIMESTAMP},
+      update_time = #{updateTime,jdbcType=TIMESTAMP}
+    where id = #{id,jdbcType=INTEGER}
+  </update>
+
+</mapper>

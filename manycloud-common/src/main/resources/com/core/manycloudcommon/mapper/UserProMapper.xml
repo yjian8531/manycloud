@@ -1,0 +1,180 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="com.core.manycloudcommon.mapper.UserProMapper" >
+  <resultMap id="BaseResultMap" type="com.core.manycloudcommon.entity.UserPro" >
+    <id column="id" property="id" jdbcType="INTEGER" />
+    <result column="user_id" property="userId" jdbcType="VARCHAR" />
+    <result column="pro_user_id" property="proUserId" jdbcType="VARCHAR" />
+    <result column="status" property="status" jdbcType="INTEGER" />
+    <result column="remark" property="remark" jdbcType="VARCHAR" />
+    <result column="create_time" property="createTime" jdbcType="TIMESTAMP" />
+  </resultMap>
+  <sql id="Base_Column_List" >
+    id, user_id, pro_user_id, status, remark, create_time
+  </sql>
+  <select id="selectByPrimaryKey" resultMap="BaseResultMap" parameterType="java.lang.Integer" >
+    select 
+    <include refid="Base_Column_List" />
+    from t_user_pro
+    where id = #{id,jdbcType=INTEGER}
+  </select>
+  <delete id="deleteByPrimaryKey" parameterType="java.lang.Integer" >
+    delete from t_user_pro
+    where id = #{id,jdbcType=INTEGER}
+  </delete>
+  <insert id="insert" parameterType="com.core.manycloudcommon.entity.UserPro" >
+    <selectKey resultType="java.lang.Integer" keyProperty="id" order="AFTER" >
+      SELECT LAST_INSERT_ID()
+    </selectKey>
+    insert into t_user_pro (user_id, pro_user_id, status, 
+      remark, create_time)
+    values (#{userId,jdbcType=VARCHAR}, #{proUserId,jdbcType=VARCHAR}, #{status,jdbcType=INTEGER}, 
+      #{remark,jdbcType=VARCHAR}, #{createTime,jdbcType=TIMESTAMP})
+  </insert>
+  <insert id="insertSelective" parameterType="com.core.manycloudcommon.entity.UserPro" >
+    <selectKey resultType="java.lang.Integer" keyProperty="id" order="AFTER" >
+      SELECT LAST_INSERT_ID()
+    </selectKey>
+    insert into t_user_pro
+    <trim prefix="(" suffix=")" suffixOverrides="," >
+      <if test="userId != null" >
+        user_id,
+      </if>
+      <if test="proUserId != null" >
+        pro_user_id,
+      </if>
+      <if test="status != null" >
+        status,
+      </if>
+      <if test="remark != null" >
+        remark,
+      </if>
+      <if test="createTime != null" >
+        create_time,
+      </if>
+    </trim>
+    <trim prefix="values (" suffix=")" suffixOverrides="," >
+      <if test="userId != null" >
+        #{userId,jdbcType=VARCHAR},
+      </if>
+      <if test="proUserId != null" >
+        #{proUserId,jdbcType=VARCHAR},
+      </if>
+      <if test="status != null" >
+        #{status,jdbcType=INTEGER},
+      </if>
+      <if test="remark != null" >
+        #{remark,jdbcType=VARCHAR},
+      </if>
+      <if test="createTime != null" >
+        #{createTime,jdbcType=TIMESTAMP},
+      </if>
+    </trim>
+  </insert>
+  <update id="updateByPrimaryKeySelective" parameterType="com.core.manycloudcommon.entity.UserPro" >
+    update t_user_pro
+    <set >
+      <if test="userId != null" >
+        user_id = #{userId,jdbcType=VARCHAR},
+      </if>
+      <if test="proUserId != null" >
+        pro_user_id = #{proUserId,jdbcType=VARCHAR},
+      </if>
+      <if test="status != null" >
+        status = #{status,jdbcType=INTEGER},
+      </if>
+      <if test="remark != null" >
+        remark = #{remark,jdbcType=VARCHAR},
+      </if>
+      <if test="createTime != null" >
+        create_time = #{createTime,jdbcType=TIMESTAMP},
+      </if>
+    </set>
+    where id = #{id,jdbcType=INTEGER}
+  </update>
+  <update id="updateByPrimaryKey" parameterType="com.core.manycloudcommon.entity.UserPro" >
+    update t_user_pro
+    set user_id = #{userId,jdbcType=VARCHAR},
+      pro_user_id = #{proUserId,jdbcType=VARCHAR},
+      status = #{status,jdbcType=INTEGER},
+      remark = #{remark,jdbcType=VARCHAR},
+      create_time = #{createTime,jdbcType=TIMESTAMP}
+    where id = #{id,jdbcType=INTEGER}
+  </update>
+
+  <select id="selectByUserId" resultMap="BaseResultMap" parameterType="java.lang.String" >
+    select
+    <include refid="Base_Column_List" />
+    from t_user_pro
+    where user_id = #{userId,jdbcType=VARCHAR}
+  </select>
+
+
+
+  <select id="selectByUserIds" resultMap="BaseResultMap" parameterType="java.util.List" >
+    select
+    up.id, up.user_id, up.pro_user_id, up.status, up.remark, up.create_time,u.email as proUserAccount
+    from
+    t_user_pro as up
+    left join
+    t_user_info as u on u.user_id = up.pro_user_id
+    where up.user_id in
+    <foreach item="item" collection="list" separator="," open="(" close=")">
+      #{item,jdbcType=VARCHAR}
+    </foreach>
+  </select>
+
+  <select id="selectByProUserId" resultMap="BaseResultMap" parameterType="java.lang.String" >
+    select
+      up.id, up.user_id, up.pro_user_id, up.status, up.remark, up.create_time,u.email as userAccount
+    from
+      t_user_pro as up
+    left join
+      t_user_info as u on u.user_id = up.user_id
+    where
+      up.pro_user_id = #{proUserId,jdbcType=VARCHAR}
+  </select>
+
+  <select id="selectByProUserIds" resultMap="BaseResultMap" parameterType="java.util.List" >
+    select
+    up.id, up.user_id, up.pro_user_id, up.status, up.remark, up.create_time,u.email as userAccount
+    from
+    t_user_pro as up
+    left join
+    t_user_info as u on u.user_id = up.user_id
+    where
+    up.pro_user_id in
+    <foreach item="item" collection="list" separator="," open="(" close=")">
+      #{item,jdbcType=VARCHAR}
+    </foreach>
+
+  </select>
+
+
+  <select id="selectList" resultType="com.core.manycloudcommon.vo.finance.QueryUserProListVO" parameterType="java.util.Map">
+    select
+    u.user_id as userId,u.phone,u.email,u.nick_name as name,u.create_time as createTime,
+    IFNULL(sum(c.consumption),0.0)as consumptionTotal,
+    IFNULL(sum(c.commission),0.0)as commissionTotal
+    from
+    t_user_pro as up
+    left join
+    t_user_info as u on u.user_id = up.user_id
+    left join
+    t_commission_detail as c on c.low_user_id = up.user_id
+    where
+    up.pro_user_id = #{userId,jdbcType=VARCHAR}
+    <if test="account != null" >
+      and (u.phone = #{account,jdbcType=VARCHAR} or u.email = #{account,jdbcType=VARCHAR})
+    </if>
+    <if test="startTime != null" >
+      and u.create_time > #{startTime,jdbcType=VARCHAR}
+    </if>
+    <if test="endTime != null" >
+      and  #{endTime,jdbcType=VARCHAR} > u.create_time
+    </if>
+    group by up.user_id
+    order by u.create_time desc
+  </select>
+
+</mapper>
