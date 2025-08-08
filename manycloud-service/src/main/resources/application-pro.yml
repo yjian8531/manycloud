@@ -1,0 +1,106 @@
+#端口配置
+server:
+  port: 8806
+
+#mybatis
+mybatis:
+  mapper-locations: classpath:mapper/*Mapper.xml
+
+spring:
+
+  #服务名称
+  application:
+    name: manycloud-service
+
+  #redis
+  redis:
+    host: 127.0.0.1
+    port: 6369
+    password: bly2020!@#
+
+  task:
+    execution:
+      pool:
+        core-size: 10
+        max-size: 20
+        keep-alive: 120s
+        queue-capacity: 1000
+        allow-core-thread-timeout: true
+
+  #mysql
+  datasource:
+    url: jdbc:mysql://bly.rwlb.rds.aliyuncs.com:3578/manycloud?useUnicode=true&characterEncoding=utf8&useSSL=false
+    username: baoliannetcloud
+    password: y38B70HDKD06Z3Oi1H7A
+    driver-class-name: com.mysql.jdbc.Driver
+    max-idle: 10
+    max-wait: 86400
+    min-idle: 5
+    initial-size: 5
+
+#配置分页插件pagehelper
+pagehelper:
+  helperDialect: mysql
+  reasonable: true
+  supportMethodsArguments: true
+  params: count=countSql
+
+#空中云汇
+airwallex:
+  cKey: EF01781D65D45A76
+  secret: whsec_XFQz1mkYmL7ULa9G14-UZk2eyx08BH1m
+  api:
+    gettoken: https://api.airwallex.com/api/v1/authentication/login
+    createintents: https://api.airwallex.com/api/v1/pa/payment_intents/create
+
+#weChatPay
+wx:
+  appid: wx5729f4551acff45a
+  appsecret: 465e0e3bf92ee922ce07727007e6d4ca
+  mchid: 1622808107
+  paternerkey: 6699eab3ace94a1f8161af026c6be830
+  merchantSerialNumber: 43308EB4FDE417C54CF5D7FB3A70059BED5B9F2E
+  web:
+    url: https://openapi.alipay.com/gateway.do
+    notify:
+      url: https://www.lotvps.com/pay/wechat/notify
+    return:
+      url: https://www.lotvps.com/#/recharge
+  h5:
+    url: https://openapi.alipay.com/gateway.do
+    notify:
+      url:  https://www.lotvps.com/pay/wechat/notify
+    return:
+      url: https://www.lotvps.com/#/recharge
+
+#aliPay
+al:
+  appid: 2021001168660285
+  web:
+    url: https://openapi.alipay.com/gateway.do
+    notify:
+      url: https://www.lotvps.com/pay/alipay/back
+    return:
+      url: https://www.lotvps.com/#/recharge
+
+#weixin
+wxm:
+  appid: wx3268be6fdfff1bc3
+  appsecret: 283c04b81f2cd70a440fd6743c61b333
+  apiurl: https://api.weixin.qq.com
+
+web:
+  upload-path: /app/upload
+  access-path: https://www.lotvps.com:2205/
+
+register:
+  market:
+    url: https://www.lotvps.com/#/register?market={0}
+
+
+#日志配置
+logging:
+  config: classpath:logging-config.xml
+
+init:
+  request: /platform/user/logon/device

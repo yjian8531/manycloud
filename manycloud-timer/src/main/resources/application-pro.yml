@@ -1,0 +1,63 @@
+#端口配置
+server:
+  port: 8808
+
+#mybatis
+mybatis:
+  mapper-locations: classpath:mapper/*Mapper.xml
+
+spring:
+
+  #服务名称
+  application:
+    name: manycloud-timer
+
+  #redis
+  redis:
+    host: 127.0.0.1
+    port: 6369
+    password: bly2020!@#
+
+  task:
+    execution:
+      pool:
+        core-size: 10
+        max-size: 20
+        keep-alive: 120s
+        queue-capacity: 1000
+        allow-core-thread-timeout: true
+
+  #mysql
+  datasource:
+    url: jdbc:mysql://bly.rwlb.rds.aliyuncs.com:3578/manycloud?useUnicode=true&characterEncoding=utf8&useSSL=false
+    username: baoliannetcloud
+    password: y38B70HDKD06Z3Oi1H7A
+    driver-class-name: com.mysql.jdbc.Driver
+    max-idle: 10
+    max-wait: 86400
+    min-idle: 5
+    initial-size: 5
+
+#配置分页插件pagehelper
+pagehelper:
+  helperDialect: mysql
+  reasonable: true
+  supportMethodsArguments: true
+  params: count=countSql
+
+base_service:
+  promotionCount: http://127.0.0.1:8806/finance/promotion/count
+
+
+#weixin
+wxm:
+  appid: wx3268be6fdfff1bc3
+  appsecret: 283c04b81f2cd70a440fd6743c61b333
+  apiurl: https://api.weixin.qq.com
+
+#日志配置
+logging:
+  config: classpath:logging-config.xml
+
+init:
+  request: /platform/user/logon/device
