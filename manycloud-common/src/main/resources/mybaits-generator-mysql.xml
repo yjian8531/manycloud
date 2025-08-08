@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE generatorConfiguration
+	  PUBLIC "-//mybatis.org//DTD MyBatis Generator Configuration 1.0//EN"
+	  "http://mybatis.org/dtd/mybatis-generator-config_1_0.dtd">
+<generatorConfiguration>
+
+	<classPathEntry location="D:\maven-repository\mysql\mysql-connector-java\5.1.32\mysql-connector-java-5.1.32.jar"></classPathEntry>
+	<context id="MysqlTables" targetRuntime="MyBatis3">
+		<property name="javaFileEncoding" value="UTF-8"/>
+		<commentGenerator>
+			<property name="suppressAllComments" value="true" />
+		</commentGenerator>
+		<!-- mysql相关配置 -->
+		<jdbcConnection driverClass="com.mysql.jdbc.Driver"
+						connectionURL="jdbc:mysql://bly.rwlb.rds.aliyuncs.com:3578/manycloud?useUnicode=true&amp;characterEncoding=utf8&amp;useSSL=false"
+						userId="baoliannetcloud" password="y38B70HDKD06Z3Oi1H7A">
+		</jdbcConnection>
+
+		<!-- 是否忽略BigDecimals 非必填项 -->
+		<javaTypeResolver>
+			<property name="forceBigDecimals" value="false" />
+		</javaTypeResolver>
+
+		<!-- java类 -->
+		<javaModelGenerator targetPackage="com.core.manycloudcommon.entity"
+			targetProject="D:\manycloud\manycloud-common\src\main\java\">
+			<property name="enableSubPackages" value="true" />
+			<property name="trimStrings" value="true" />
+		</javaModelGenerator>
+
+		<!-- *Mapper.xml生成的位置 -->
+		<sqlMapGenerator targetPackage="com.core.manycloudcommon.mapper"
+			targetProject="D:\manycloud\manycloud-common\src\main\resources">
+			<property name="enableSubPackages" value="true" />
+		</sqlMapGenerator>
+
+		<!-- java mapper类(interface) -->
+		<javaClientGenerator type="XMLMAPPER"
+			targetPackage="com.core.manycloudcommon.mapper" targetProject="D:\manycloud\manycloud-common\src\main\java\">
+			<property name="enableSubPackages" value="true"/>
+		</javaClientGenerator>
+
+		<table tableName="t_period_node" domainObjectName="PeriodNode"
+			   enableCountByExample="false" enableDeleteByExample="false"
+			   enableSelectByExample="false" enableUpdateByExample="false">
+			<!-- 是否开始驼峰-->
+			<property name="useActualColumnNames" value="false" />
+			<property name="commentGenerator" value="true" />
+			<!-- 主键 &ndash;&gt;-->
+			<generatedKey column="id" sqlStatement="MySql" identity="true" />
+		</table>
+
+		<table tableName="t_period_type" domainObjectName="PeriodType"
+			   enableCountByExample="false" enableDeleteByExample="false"
+			   enableSelectByExample="false" enableUpdateByExample="false">
+			<!-- 是否开始驼峰-->
+			<property name="useActualColumnNames" value="false" />
+			<property name="commentGenerator" value="true" />
+			<!-- 主键 &ndash;&gt;-->
+			<generatedKey column="id" sqlStatement="MySql" identity="true" />
+		</table>
+
+
+
+	</context>
+</generatorConfiguration>
+
