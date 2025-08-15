@@ -133,6 +133,19 @@
             <version>0.4.4</version>
         </dependency>
 
+
+        <!-- stripe 支付 -->
+        <dependency>
+            <groupId>com.stripe</groupId>
+            <artifactId>stripe-java</artifactId>
+            <version>28.1.0</version>
+        </dependency>
+        <dependency>
+            <groupId>com.google.code.gson</groupId>
+            <artifactId>gson</artifactId>
+            <version>2.10.1</version> <!-- 使用最新的稳定版本 -->
+        </dependency>
+
         <dependency>
             <groupId>com.core</groupId>
             <artifactId>manycloud-common</artifactId>

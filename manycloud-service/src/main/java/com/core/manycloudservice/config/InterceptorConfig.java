@@ -33,6 +33,7 @@ public class InterceptorConfig extends WebMvcConfigurerAdapter {
 
         registry.addInterceptor(userInterceptor).addPathPatterns("/pay/**").excludePathPatterns(
                 "/pay/wechat/notify",
+                "/pay/stripe/notify",
                 "/pay/alipay/back"
         );
 

@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.*;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -89,6 +90,35 @@ public class PayController extends BaseController {
         String str = null;
         payService.weChatPayNotify(request,response);
         return new ResultMessage(ResultMessage.SUCCEED_CODE,ResultMessage.SUCCEED_MSG,str);
+    }
+
+
+    /**
+     * Stripe 充值收款
+     * @return
+     */
+    @PostMapping(value = "/stripe/web",produces = {"application/json"})
+    public ResultMessage cerateTopupOrder(@RequestBody WeChatPaySO weChatPaySO){
+
+        UserInfo userInfo = this.getLoginUser();
+
+        if(this.restriction(userInfo.getUserId())){
+            return new ResultMessage(ResultMessage.FAILED_CODE,"操作过于频繁，请稍后再试！");
+        }
+
+        return payService.cerateTopupOrder(userInfo.getUserId(),weChatPaySO.getOrderNos(),weChatPaySO.getAmount());
+    }
+
+
+    /**
+     * Stripe支付回调
+     *
+     * @param request
+     * @param response
+     */
+    @PostMapping(value = "/stripe/notify",produces = {"application/json"})
+    public void stripePayBack(HttpServletRequest request, HttpServletResponse response){
+        payService.stripePayBack(request,response);
     }
 
 

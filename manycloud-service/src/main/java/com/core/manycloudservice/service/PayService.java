@@ -40,4 +40,20 @@ public interface PayService {
     @Transactional(rollbackFor = Exception.class)
     void weChatPayNotify(HttpServletRequest request, HttpServletResponse response);
 
+    /**
+     * Stripe 充值收款
+     *
+     * @return
+     */
+    ResultMessage cerateTopupOrder(String userId,List<String> orderNos,String money);
+
+
+    /**
+     * Stripe支付回调
+     *
+     * @param request
+     * @param response
+     */
+    void stripePayBack(HttpServletRequest request, HttpServletResponse response);
+
 }
