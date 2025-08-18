@@ -19,11 +19,20 @@ import com.core.manycloudservice.service.PayService;
 import com.core.manycloudservice.util.AliPayUtil;
 import com.core.manycloudservice.util.WeChatUtil;
 import com.core.manycloudservice.util.WeiXinCaller;
+import com.core.manycloudservice.vo.CeratePayOrderVO;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.google.gson.JsonSyntaxException;
+import com.stripe.Stripe;
+import com.stripe.exception.SignatureVerificationException;
+import com.stripe.model.*;
+import com.stripe.net.ApiResource;
+import com.stripe.net.Webhook;
+import com.stripe.param.PaymentIntentCreateParams;
 import com.wechat.pay.contrib.apache.httpclient.auth.Verifier;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
+import net.sf.json.JSONArray;
 import net.sf.json.JSONObject;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpPost;
@@ -35,6 +44,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.bind.annotation.RequestBody;
 
 import javax.servlet.ServletInputStream;
 import javax.servlet.http.HttpServletRequest;
@@ -574,6 +584,239 @@ public class PayServiceImpl implements PayService {
         }catch (Exception e){
             e.printStackTrace();
         }
+    }
+
+
+    /**
+     * Stripe 充值收款
+     *
+     * @return
+     */
+    public ResultMessage cerateTopupOrder(String userId,List<String> orderNos,String money) {
+
+        String payOrderId = CommonUtil.getRandomStr(32);
+
+        Stripe.apiKey = ev.getProperty("stripe.privateSecret");
+
+        BigDecimal a = new BigDecimal(money).multiply(BigDecimal.valueOf(100));
+
+
+        PaymentIntent paymentIntent;
+
+        /** 客户端私钥 **/
+        String clientSecret = null;
+        /** 支付链接 **/
+        String paymentUrl = null;
+
+        String orderStr = null;
+        if(orderNos != null && orderNos.size() > 0){
+            StringBuffer str = new StringBuffer();
+            for(String orderNo : orderNos){
+                str.append(orderNo+",");
+            }
+            orderStr = str.toString().substring(0,str.length() - 1);
+        }
+
+        try {
+            Map<String, Object> createPaymentMethod = new HashMap<>();
+            createPaymentMethod.put("type", "alipay");
+            PaymentMethod paymentMethod = PaymentMethod.create(createPaymentMethod);
+            PaymentIntentCreateParams params = PaymentIntentCreateParams.builder()
+                    .setAmount(a.longValue()) // Stripe金额以分为单位
+                    .setCurrency("cny")
+                    .setPaymentMethod(paymentMethod.getId())
+                    .setReturnUrl("https://www.lotvps.com/#/success") // 支付完成后的回调 URL
+                    .putMetadata("orderId", payOrderId)
+                    .putMetadata("way","2")
+                    .putMetadata("orderNo", StringUtils.isNotEmpty(orderStr) ? orderStr : "")
+                    .setConfirm(true) // 立即确认支付
+                    .build();
+            paymentIntent = PaymentIntent.create(params);
+            clientSecret = paymentIntent.getClientSecret();
+            if (paymentIntent.getStatus().equals("requires_action")) {
+                paymentUrl = paymentIntent.getNextAction().getAlipayHandleRedirect().getUrl();
+            } else {
+                return new ResultMessage(ResultMessage.FAILED_CODE, ResultMessage.FAILED_MSG);
+            }
+        } catch (Exception e) {
+            log.info("Stripe 支付宝 充值调用异常：{}", e.getMessage());
+        }
+
+
+        if (StringUtils.isNotEmpty(clientSecret)) {
+            TopupInfo topupInfo = new TopupInfo();
+            topupInfo.setUserId(userId);
+            topupInfo.setMoneyNum(new BigDecimal(money));
+            topupInfo.setTopupNo(payOrderId);
+            topupInfo.setIntentId(clientSecret);
+            if(StringUtils.isNotEmpty(orderStr)){
+                topupInfo.setOrderNo(orderStr);
+                topupInfo.setWay(CommonUtil.STATUS_1);//订单支付
+            }else{
+                topupInfo.setWay(CommonUtil.STATUS_0);//余额充值
+            }
+            topupInfo.setType(2);
+            topupInfo.setStatus(CommonUtil.STATUS_0);
+            topupInfo.setCreateTime(new Date());
+            topupInfo.setUpdateTime(new Date());
+            topupInfoMapper.insertSelective(topupInfo);
+
+            CeratePayOrderVO ceratePayOrderVO = new CeratePayOrderVO();
+            ceratePayOrderVO.setClientSecret(clientSecret);
+            ceratePayOrderVO.setPaymentUrl(paymentUrl);
+            ceratePayOrderVO.setBaseAmount(new BigDecimal(money).doubleValue());
+            return new ResultMessage(ResultMessage.SUCCEED_CODE, ResultMessage.SUCCEED_MSG, ceratePayOrderVO);
+
+        } else {
+            return new ResultMessage(ResultMessage.FAILED_CODE, ResultMessage.FAILED_MSG);
+        }
+
+
+    }
+
+
+    /**
+     * Stripe支付回调
+     *
+     * @param request
+     * @param response
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public void stripePayBack(HttpServletRequest request, HttpServletResponse response) {
+
+        Stripe.apiKey = ev.getProperty("stripe.privateSecret");
+        String endpointSecret = ev.getProperty("stripe.endpointSecret");
+        StringBuffer sb = new StringBuffer();
+
+        try (
+                ServletInputStream inputStream = request.getInputStream();
+                BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream));
+        ) {
+            String line;
+
+            while ((line = reader.readLine()) != null) {
+                sb.append(line);
+            }
+
+        } catch (IOException e) {
+            log.error("Stripe支付读取数据流异常:{}", e);
+            return;
+        }
+        //获取报文
+        String body = sb.toString();
+        log.info("Stripe 支付回调报文：{}", body);
+        Event event = null;
+
+        try {
+            event = ApiResource.GSON.fromJson(body, Event.class);
+        } catch (JsonSyntaxException e) {
+            // Invalid payload
+            log.info("stripe 支付回调 [解析错误]");
+            return;
+        }
+
+        String sigHeader = request.getHeader("Stripe-Signature");
+
+        if (endpointSecret != null && sigHeader != null) {
+            try {
+                event = Webhook.constructEvent(
+                        body, sigHeader, endpointSecret
+                );
+            } catch (SignatureVerificationException e) {
+                log.info("stripe 支付回调 [验签错误]");
+                //return;
+            }
+        }
+
+        // Deserialize the nested object inside the event
+        EventDataObjectDeserializer dataObjectDeserializer = event.getDataObjectDeserializer();
+        StripeObject stripeObject = null;
+        if (dataObjectDeserializer.getObject().isPresent()) {
+            stripeObject = dataObjectDeserializer.getObject().get();
+        } else {
+            //反序列化失败，可能是由于API版本不匹配。
+
+            //请参阅有关“EventDataObjectDeserializer”的Javadoc文档
+
+            //有关如何处理此情况的说明，或在此处返回错误。
+        }
+        log.info("stripe 支付回调 支付状态[{}]", event.getType());
+        switch (event.getType()) {
+            case "payment_intent.succeeded":
+                PaymentIntent paymentIntent = (PaymentIntent) stripeObject;
+                String orderId = paymentIntent.getMetadata().get("orderId");
+                log.info("stripe 支付回调 收款成功[{}-{}]", orderId, (paymentIntent.getAmount() / 100));
+
+                TopupInfo topupInfo = topupInfoMapper.selectByNo(orderId);
+                if (topupInfo == null) {
+                    log.info("Stripe支付异步通知-无效充值订单[{}]", paymentIntent.getClientSecret());
+                    return;
+                }
+                if (topupInfo.getStatus() == CommonUtil.STATUS_1) {
+                    log.info("Stripe支付异步通知-订单已处理[{}]", orderId);
+                    return;
+                }
+                topupInfo.setStatus(CommonUtil.STATUS_1);//充值成功
+                topupInfo.setUpdateTime(new Date());
+                int i = topupInfoMapper.updateByPrimaryKeySelective(topupInfo);
+                if (i > 0) {
+                    //更新用户余额信息
+                    userFinanceMapper.updateBalanceByUserId(topupInfo.getUserId(),"add",topupInfo.getMoneyNum());
+                    //添加账单记录
+                    //添加账单记录
+                    FinanceDetail financeDetail = new FinanceDetail();
+                    financeDetail.setUserId(topupInfo.getUserId());
+                    financeDetail.setFinanceNo(CommonUtil.getRandomStr(12));
+                    financeDetail.setProductNo(topupInfo.getTopupNo());
+                    financeDetail.setType(1);//平台类型(0:微信,1:支付宝,2:空中云汇,3:微信境外)
+                    financeDetail.setMoneyNum(topupInfo.getMoneyNum());
+                    financeDetail.setTag("topup");//充值
+                    financeDetail.setDirection(0);//收入
+                    financeDetail.setWay(2);//交易方式(0:支付宝,1:微信,2:账号余额)
+                    financeDetail.setStatus(CommonUtil.STATUS_1);//完成状态
+                    financeDetail.setCreateTime(new Date());
+                    financeDetail.setUpdateTime(new Date());
+                    financeDetailMapper.insertSelective(financeDetail);
+
+                    String timeStr = DateUtil.dateStr4(topupInfo.getCreateTime());
+                    String content = "尊敬的用户，您于 "+timeStr+" 号充值的 "+topupInfo.getMoneyNum().toPlainString()+" 元已成功到账。感谢您的支持！";
+                    SysLog sysLog = SyslogModel.output(topupInfo.getUserId(), SyslogTypeEnum.RECHARGE,content);
+                    sysLogMapper.insertSelective(sysLog);
+
+                    UserInfo userInfo = userInfoMapper.selectById(topupInfo.getUserId());
+                    /** 充值到账微信公众号通知 **/
+                    weiXinCaller.sendRechargeSuccess(topupInfo.getUserId(),userInfo.getAccount(),topupInfo.getMoneyNum(),0,financeDetail.getUpdateTime());
+
+
+                    /** 云服务器订单支付 **/
+                    if(StringUtils.isNotEmpty(topupInfo.getOrderNo())){
+                        try{
+                            List<String> orderNos = new ArrayList<>();
+                            String[] orderArray = topupInfo.getOrderNo().split(",");
+                            for(String str : orderArray){
+                                if(StringUtils.isNotEmpty(str)){
+                                    orderNos.add(str);
+                                }
+                            }
+                            /** 购买云主机 **/
+                            orderService.buy(topupInfo.getUserId(),orderNos,topupInfo.getMoneyNum());
+                        }catch (Exception e){
+                            e.printStackTrace();
+                        }
+
+                    }
+                }
+                log.info("Stripe支付异步通知-支付成功:" + orderId);
+                break;
+            case "payment_intent.payment_failed":
+
+                log.info("stripe 支付回调 收款失败{}", JSONObject.fromObject(stripeObject).toString());
+                break;
+            default:
+                log.info("stripe 支付回调 未处理的事件类型: {}", event.getType());
+                break;
+        }
+
     }
 
 
