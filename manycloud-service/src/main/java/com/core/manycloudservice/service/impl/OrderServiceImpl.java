@@ -615,6 +615,11 @@ public class OrderServiceImpl implements OrderService {
 
         /** 获取续费价格 **/
         BigDecimal price = queryRenewPrice(renewSO);
+
+        if(price.compareTo(BigDecimal.valueOf(0)) < 1){
+            return new ResultMessage(ResultMessage.FAILED_CODE,"无效金额，不支持续费。");
+        }
+
         String userId = instanceInfo.getUserId();
         UserFinance userFinance = userFinanceMapper.selectByUserId(userId);
         if(price.compareTo(userFinance.getValidNum()) > 0){
@@ -672,12 +677,12 @@ public class OrderServiceImpl implements OrderService {
                     //计算续费后的到期时间
                     Date newEndTime = null;
                     if(orderInfo.getPeriod() == 0){//按天购买
-                        newEndTime = DateUtil.addDateDays(new Date(),renewSO.getDuration());
+                        newEndTime = DateUtil.addDateDays(instanceInfo.getEndTime(),renewSO.getDuration());
                     }else if(orderInfo.getPeriod() == 1){//按月购买
-                        newEndTime = DateUtil.daysBeMonth(new Date(),renewSO.getDuration());
+                        newEndTime = DateUtil.daysBeMonth(instanceInfo.getEndTime(),renewSO.getDuration());
 
                     }else if(orderInfo.getPeriod() == 2){//按月购买
-                        newEndTime = DateUtil.addDateDays(new Date(),(renewSO.getDuration() * 30));
+                        newEndTime = DateUtil.addDateDays(instanceInfo.getEndTime(),(renewSO.getDuration() * 30));
                     }
 
                     InstanceInfo entity = new InstanceInfo();

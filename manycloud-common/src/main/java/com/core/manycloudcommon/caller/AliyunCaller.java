@@ -99,6 +99,7 @@ public class AliyunCaller implements BaseCaller{
         }else{
             request = new OpenApiRequest().setQuery(com.aliyun.openapiutil.Client.query(param));
         }
+        runtime.readTimeout = 15000;
         Map result = client.callApi(params, request, runtime);
 
         return JSONObject.fromObject(result.get("body"));
@@ -345,7 +346,7 @@ public class AliyunCaller implements BaseCaller{
 
         param.put("InstanceId", renewSO.getInstanceId());//主机ID
         param.put("Period", renewSO.getNum());//周期月
-        param.put("ClientToken", UUID.randomUUID().toString());
+        //param.put("ClientToken", UUID.randomUUID().toString());
 
         try{
             JSONObject result = exec(acction,param);

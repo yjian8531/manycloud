@@ -109,6 +109,9 @@ public class InstanceServiceImpl implements InstanceService {
     @Autowired
     private SaleDetailMapper saleDetailMapper;
 
+    @Autowired
+    private OrderInfoMapper orderInfoMapper;
+
     /***
      * 查询实例列表
      * @param queryListSO
@@ -296,6 +299,11 @@ public class InstanceServiceImpl implements InstanceService {
 
         /** 获取续费价格 **/
         BigDecimal price = queryRenewPrice(renewSO);
+
+        if(price.compareTo(BigDecimal.valueOf(0)) < 1){
+            return new ResultMessage(ResultMessage.FAILED_CODE,"无效金额，不支持续费。");
+        }
+
         String userId = instanceInfo.getUserId();
         UserFinance userFinance = userFinanceMapper.selectByUserId(userId);
         if(price.compareTo(userFinance.getValidNum()) > 0){
@@ -349,7 +357,19 @@ public class InstanceServiceImpl implements InstanceService {
                     balanceLogMapper.insertChange(userId,"minus",price,uf.getValidNum(),"续费成功扣除金额");
 
                     //计算续费后的到期时间
-                    Date newEndTime = DateUtil.daysBeMonth(instanceInfo.getEndTime(),renewSO.getDuration());
+                    OrderInfo orderInfo = orderInfoMapper.selectByNo(instanceInfo.getOrderNo());
+
+                    //计算续费后的到期时间
+                    Date newEndTime = null;
+                    if(orderInfo.getPeriod() == 0){//按天购买
+                        newEndTime = DateUtil.addDateDays(instanceInfo.getEndTime(),renewSO.getDuration());
+                    }else if(orderInfo.getPeriod() == 1){//按月购买
+                        newEndTime = DateUtil.daysBeMonth(instanceInfo.getEndTime(),renewSO.getDuration());
+
+                    }else if(orderInfo.getPeriod() == 2){//按月购买
+                        newEndTime = DateUtil.addDateDays(instanceInfo.getEndTime(),(renewSO.getDuration() * 30));
+                    }
+
                     InstanceInfo entity = new InstanceInfo();
                     entity.setId(instanceInfo.getId());
                     entity.setEndTime(newEndTime);
