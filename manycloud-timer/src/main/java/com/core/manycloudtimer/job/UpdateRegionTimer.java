@@ -29,8 +29,8 @@ import java.util.regex.Pattern;
  * 定时任务 定时去更新不同平台的地域
  */
 @Slf4j
-@Component
-@EnableScheduling
+@Component      //1.主要用于标记配置类，兼备Component的效果。
+@EnableScheduling   // 2.开启定时任务
 public class UpdateRegionTimer {
 
 
@@ -55,7 +55,7 @@ public class UpdateRegionTimer {
         try {
             log.info("开始执行镜像信息更新任务");
 
-            //获取所有 UCLOUD 节点
+            // 获取所有 UCLOUD 节点
             List<NodeInfo> nodeInfos = nodeInfoMapper.selectByLabel(PlatformLabelEnum.UCLOUD.getLabel());
             log.info("通过 UCLOUD 标签获取到 {} 个节点", nodeInfos.size());
 
@@ -74,7 +74,6 @@ public class UpdateRegionTimer {
                 String projectId = null;
                 if (StringUtils.isNotEmpty(nodeInfo.getNodeParam())) {
                     JSONObject param = JSONObject.fromObject(nodeInfo.getNodeParam());
-                    //projectId 字段存在性判断
                     if (param.containsKey("projectId")) {
                         projectId = param.getString("projectId");
                     }
@@ -90,13 +89,11 @@ public class UpdateRegionTimer {
                         .projectId(projectId)
                         .build();
 
-                // 获取 UCloud Caller 实例
+                // 获取 UCloud Caller 实例并获取镜像信息
                 UcloudCaller caller = UcloudCaller.getClient(accountApi);
-
-                // 获取 UCloud 镜像信息
                 String imageInfo = caller.getImage();
 
-                // 打印数据
+                // 打印原始数据
                 try {
                     JSONObject rawJson = JSONObject.fromObject(imageInfo);
                     log.info("UCloud 镜像原始数据: \n{}", rawJson.toString(2));
@@ -106,34 +103,59 @@ public class UpdateRegionTimer {
 
                 // 解析 JSON 数据
                 JSONObject imageJson = JSONObject.fromObject(imageInfo);
-
-                // 检查 RetCode 是否为 0（表示成功）
                 if (!imageJson.containsKey("RetCode") || imageJson.getInt("RetCode") != 0) {
                     log.error("UCloud API 调用失败，错误信息: \n{}", imageJson.toString(2));
                     continue;
                 }
 
-                // 检查是否有 ImageSet 字段且为 JSONArray
                 if (!imageJson.containsKey("ImageSet")) {
-                    log.warn("返回数据中没有找到 ImageSet 字段，完整返回数据: \n{}", imageJson.toString(2));
+                    log.warn("返回数据中没有找到 ImageSet 字段");
                     continue;
                 }
 
                 Object infosObj = imageJson.get("ImageSet");
                 if (!(infosObj instanceof JSONArray)) {
-                    log.warn("ImageSet 字段不是 JSONArray 类型，实际类型: {}，值: \n{}",
-                            infosObj.getClass().getName(), formatJsonObject(infosObj));
+                    log.warn("ImageSet 不是 JSONArray 类型，实际类型: {}", infosObj.getClass().getName());
                     continue;
                 }
 
                 JSONArray images = (JSONArray) infosObj;
                 log.info("共解析到 {} 条镜像数据", images.size());
 
-                // 根据节点 ID 查询不同节点的多个版本
+                // 判断是否为特殊区域（台北、东京、首尔）
+                boolean isSpecialRegion = nodeInfo.getNodeName().contains("台北") ||
+                        nodeInfo.getNodeName().contains("东京") ||
+                        nodeInfo.getNodeName().contains("首尔");
+
+                JSONArray filteredImages = new JSONArray();
+                if (isSpecialRegion) {
+                    // 特殊区域保留所有镜像
+                    filteredImages.addAll(images);
+                    log.info("节点 {} 是特殊区域，保留所有 {} 条镜像数据", nodeInfo.getNodeName(), images.size());
+                } else {
+                    // 非特殊区域筛选：高内核 或 Windows 镜像
+                    for (int i = 0; i < images.size(); i++) {
+                        JSONObject image = images.getJSONObject(i);
+                        String osName = image.getString("OsName");
+
+                        // 确保不遗漏Windows镜像
+                        boolean isHighKernel = osName.startsWith("高内核");
+                        boolean isWindows = osName.toLowerCase().contains("windows");
+
+                        if (isHighKernel || isWindows) {
+                            filteredImages.add(image);
+                            log.debug("保留镜像: OsName=[{}], 高内核=[{}], Windows=[{}]",
+                                    osName, isHighKernel, isWindows);
+                        }
+                    }
+                    log.info("节点 {} 非特殊区域，过滤后剩余 {} 条镜像数据", nodeInfo.getNodeName(), filteredImages.size());
+                }
+                images = filteredImages;
+
+                // 处理节点镜像版本匹配
                 List<NodeImage> nodeImages = nodeImageMapper.selectByNode(nodeInfo.getId());
                 log.info("根据节点 ID {} 查询到 {} 个镜像版本", nodeInfo.getId(), nodeImages.size());
 
-                //根据这些版本获取对应的镜像 ID 去修改节点镜像 ID
                 for (NodeImage nodeImage : nodeImages) {
                     if (nodeImage == null) {
                         log.warn("发现空的 NodeImage 对象，跳过处理");
@@ -141,23 +163,23 @@ public class UpdateRegionTimer {
                     }
 
                     String imageVersion = nodeImage.getImageVersion();
-                    log.info("处理数据库镜像版本: {}", imageVersion);
+                    log.info("处理数据库镜像版本: [{}]", imageVersion);
 
                     if (StringUtils.isEmpty(imageVersion)) {
                         log.warn("镜像版本为空，跳过处理");
                         continue;
                     }
 
-                    // 遍历 API 镜像，匹配版本
+                    // 遍历筛选后的镜像进行版本匹配
                     JSONObject targetImage = null;
                     for (int i = 0; i < images.size(); i++) {
                         JSONObject image = images.getJSONObject(i);
                         String apiOsName = image.getString("OsName");
-
-                        // 调用工具方法，提取版本
                         String apiVersion = extractVersion(apiOsName);
-                        log.debug("API原始OsName: [{}]，提取后版本: [{}]，数据库版本: [{}]",
-                                apiOsName, apiVersion, imageVersion);
+
+                        log.debug("API原始OsName: [{}], 提取后版本: [{}], 数据库版本: [{}], 匹配结果: {}",
+                                apiOsName, apiVersion, imageVersion,
+                                imageVersion.equals(apiVersion) ? "匹配" : "不匹配");
 
                         if (imageVersion.equals(apiVersion)) {
                             targetImage = image;
@@ -166,28 +188,23 @@ public class UpdateRegionTimer {
                     }
 
                     if (targetImage == null) {
-                        log.warn("未找到镜像版本 {} 的记录", imageVersion);
+                        log.warn("未找到镜像版本 {} 的记录，检查版本格式是否匹配", imageVersion);
                         continue;
                     }
 
-                    // 获取新镜像 ID 并清理
+                    // 处理镜像ID更新
                     String newImageId = targetImage.getString("ImageId");
                     String dbImageId = nodeImage.getImageParam();
-
-                    //去除首尾空格，处理 null 情况
                     String cleanDbId = (dbImageId != null) ? dbImageId.trim() : "";
                     String cleanApiId = (newImageId != null) ? newImageId.trim() : "";
 
-                    log.info("镜像ID对比 - 数据库值: [{}]（长度: {}），API值: [{}]（长度: {}）",
-                            cleanDbId, cleanDbId.length(),
-                            cleanApiId, cleanApiId.length());
+                    log.info("镜像ID对比 - 数据库值: [{}]，API值: [{}]", cleanDbId, cleanApiId);
 
-                    // 比较清理后的字符串
                     if (!cleanDbId.equals(cleanApiId)) {
                         log.info("准备更新镜像记录 - SQL: UPDATE t_node_image SET image_param = '{}' WHERE id = {}",
                                 cleanApiId, nodeImage.getId());
-                        nodeImage.setImageParam(cleanApiId); // 存储清理后的值
-                        nodeImageMapper.updateByPrimaryKeySelective(nodeImage);
+                        // nodeImage.setImageParam(cleanApiId);
+                        // nodeImageMapper.updateByPrimaryKeySelective(nodeImage);
                         log.info("已更新镜像版本 {}，新镜像 ID：{}", imageVersion, cleanApiId);
                     } else {
                         log.info("镜像版本 {} 已是最新，无需更新", imageVersion);
@@ -198,6 +215,7 @@ public class UpdateRegionTimer {
         } catch (Exception e) {
             log.error("更新镜像信息失败", e);
         }
+
     }
     /**
      *Rcloud每天凌晨4点执行触发
@@ -329,7 +347,7 @@ public class UpdateRegionTimer {
                         log.info("准备更新：UPDATE t_node_image SET image_param = '{}' WHERE id = {}",
                                 cleanApiId, nodeImage.getId());
                         nodeImage.setImageParam(cleanApiId); // 存储清理后的值，避免后续差异
-                        nodeImageMapper.updateByPrimaryKeySelective(nodeImage);
+                        //nodeImageMapper.updateByPrimaryKeySelective(nodeImage);
                         log.info("已更新镜像版本 {}，新镜像 ID：{}", imageVersion, cleanApiId);
                     } else {
                         log.info("镜像版本 {} 已是最新，无需更新", imageVersion);
@@ -507,7 +525,7 @@ public class UpdateRegionTimer {
                         log.info("准备更新：UPDATE t_node_image SET image_param = '{}' WHERE id = {}",
                                 cleanApiId, nodeImage.getId());
                         nodeImage.setImageParam(cleanApiId); // 存储清理后的值
-                        nodeImageMapper.updateByPrimaryKeySelective(nodeImage); // 确保数据库更新执行
+                        //nodeImageMapper.updateByPrimaryKeySelective(nodeImage); // 确保数据库更新执行
                         log.info("已更新镜像版本 {}，新镜像 ID：{}", imageVersion, cleanApiId);
                     } else {
                         log.info("镜像版本 {} 已是最新，无需更新", imageVersion);
@@ -525,31 +543,40 @@ public class UpdateRegionTimer {
         if (osName == null) {
             return "";
         }
-        // 优先处理高内核开头的格式
-        if (osName.startsWith("高内核")) {
-            // 正则匹配：高内核 + 可选系统名 + 版本
+
+        // 统一处理空格和特殊字符
+        String processed = osName.trim().replaceAll("\\s+", " ");
+
+        // 处理高内核格式
+        if (processed.startsWith("高内核")) {
             Pattern pattern = Pattern.compile("^高内核(?:CentOS|Ubuntu|Windows|Debian|Server)?\\s+(.*)$");
-            Matcher matcher = pattern.matcher(osName);
+            Matcher matcher = pattern.matcher(processed);
             if (matcher.find()) {
                 return "高内核 " + matcher.group(1).trim();
             }
         }
 
-        // 处理 Kubernetes 格式
+        // 处理Kubernetes格式
         Pattern kubePattern = Pattern.compile("^(Kubernetes\\s+[\\d.]+\\s+on)\\s+\\w+\\s+([\\d.]+)$");
-        Matcher kubeMatcher = kubePattern.matcher(osName);
+        Matcher kubeMatcher = kubePattern.matcher(processed);
         if (kubeMatcher.find()) {
             return kubeMatcher.group(1) + " " + kubeMatcher.group(2);
         }
 
-        // 处理常规系统前缀如 Windows、CentOS 等
+        //  处理Windows系统 避免被其他前缀截取
+        if (processed.startsWith("Windows")) {
+            return processed.substring("Windows".length()).trim();
+        }
+
+        // 处理其他系统前缀
         for (String prefix : SYSTEM_PREFIXES) {
-            if (osName.startsWith(prefix)) {
-                return osName.substring(prefix.length());
+            if (processed.startsWith(prefix) && !"Windows".equals(prefix)) {
+                return processed.substring(prefix.length()).trim();
             }
         }
 
-        return osName;
+        // 5. 未匹配到任何规则，返回原始处理后的值
+        return processed;
     }
 
     /**
