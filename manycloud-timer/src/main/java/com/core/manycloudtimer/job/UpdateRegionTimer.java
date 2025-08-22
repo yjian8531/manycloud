@@ -203,8 +203,8 @@ public class UpdateRegionTimer {
                     if (!cleanDbId.equals(cleanApiId)) {
                         log.info("准备更新镜像记录 - SQL: UPDATE t_node_image SET image_param = '{}' WHERE id = {}",
                                 cleanApiId, nodeImage.getId());
-                        // nodeImage.setImageParam(cleanApiId);
-                        // nodeImageMapper.updateByPrimaryKeySelective(nodeImage);
+                         nodeImage.setImageParam(cleanApiId);
+                         nodeImageMapper.updateByPrimaryKeySelective(nodeImage);
                         log.info("已更新镜像版本 {}，新镜像 ID：{}", imageVersion, cleanApiId);
                     } else {
                         log.info("镜像版本 {} 已是最新，无需更新", imageVersion);
@@ -347,7 +347,7 @@ public class UpdateRegionTimer {
                         log.info("准备更新：UPDATE t_node_image SET image_param = '{}' WHERE id = {}",
                                 cleanApiId, nodeImage.getId());
                         nodeImage.setImageParam(cleanApiId); // 存储清理后的值，避免后续差异
-                        //nodeImageMapper.updateByPrimaryKeySelective(nodeImage);
+                        nodeImageMapper.updateByPrimaryKeySelective(nodeImage);
                         log.info("已更新镜像版本 {}，新镜像 ID：{}", imageVersion, cleanApiId);
                     } else {
                         log.info("镜像版本 {} 已是最新，无需更新", imageVersion);
@@ -525,7 +525,7 @@ public class UpdateRegionTimer {
                         log.info("准备更新：UPDATE t_node_image SET image_param = '{}' WHERE id = {}",
                                 cleanApiId, nodeImage.getId());
                         nodeImage.setImageParam(cleanApiId); // 存储清理后的值
-                        //nodeImageMapper.updateByPrimaryKeySelective(nodeImage); // 确保数据库更新执行
+                        nodeImageMapper.updateByPrimaryKeySelective(nodeImage); // 确保数据库更新执行
                         log.info("已更新镜像版本 {}，新镜像 ID：{}", imageVersion, cleanApiId);
                     } else {
                         log.info("镜像版本 {} 已是最新，无需更新", imageVersion);
