@@ -575,7 +575,7 @@ public class UpdateRegionTimer {
             }
         }
 
-        // 5. 未匹配到任何规则，返回原始处理后的值
+        // 未匹配到任何规则，返回原始处理后的值
         return processed;
     }
 
