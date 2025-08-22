@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.core.manycloudcommon.mapper.FirewallInfoMapper">
+  <resultMap id="BaseResultMap" type="com.core.manycloudcommon.entity.FirewallInfo">
+    <id column="id" jdbcType="INTEGER" property="id" />
+    <result column="firewall_id" jdbcType="VARCHAR" property="firewallId" />
+    <result column="name" jdbcType="VARCHAR" property="name" />
+    <result column="instance_id" jdbcType="VARCHAR" property="instanceId" />
+    <result column="user_id" jdbcType="VARCHAR" property="userId" />
+    <result column="platform_label" jdbcType="VARCHAR" property="platformLabel" />
+    <result column="port" jdbcType="VARCHAR" property="port" />
+    <result column="protocol" jdbcType="VARCHAR" property="protocol" />
+    <result column="description" jdbcType="VARCHAR" property="description" />
+    <result column="status" jdbcType="INTEGER" property="status" />
+    <result column="create_time" jdbcType="TIMESTAMP" property="createTime" />
+    <result column="update_time" jdbcType="TIMESTAMP" property="updateTime" />
+  </resultMap>
+
+  <sql id="Base_Column_List">
+    id, firewall_id, name, instance_id, user_id,port,protocol,platform_label, description, status, create_time, update_time
+  </sql>
+
+  <insert id="insert" parameterType="com.core.manycloudcommon.entity.FirewallInfo">
+    insert into t_firewall_info (firewall_id, name, instance_id, user_id,port,protocol,platform_label, description, status)
+    values (#{firewallId,jdbcType=VARCHAR}, #{name,jdbcType=VARCHAR}, #{instanceId,jdbcType=VARCHAR},
+            #{userId,jdbcType=VARCHAR},#{port,jdbcType=VARCHAR},#{protocol,jdbcType=VARCHAR},
+            #{platformLabel,jdbcType=VARCHAR}, #{description,jdbcType=VARCHAR},
+            #{status,jdbcType=INTEGER})
+  </insert>
+
+  <update id="updateByPrimaryKey" parameterType="com.core.manycloudcommon.entity.FirewallInfo">
+    update t_firewall_info
+    set firewall_id = #{firewallId,jdbcType=VARCHAR},
+        name = #{name,jdbcType=VARCHAR},
+        instance_id = #{instanceId,jdbcType=VARCHAR},
+        user_id = #{userId,jdbcType=VARCHAR},
+        port = #{port,jdbcType=VARCHAR},
+        protocol = #{protocol,jdbcType=VARCHAR},
+        platform_label = #{platformLabel,jdbcType=VARCHAR},
+        description = #{description,jdbcType=VARCHAR},
+        status = #{status,jdbcType=INTEGER}
+    where id = #{id,jdbcType=INTEGER}
+  </update>
+
+  <select id="selectByPrimaryKey" parameterType="java.lang.Integer" resultMap="BaseResultMap">
+    select <include refid="Base_Column_List" />
+    from t_firewall_info
+    where id = #{id,jdbcType=INTEGER}
+  </select>
+
+  <select id="selectByInstanceId" parameterType="java.lang.String" resultMap="BaseResultMap">
+    select <include refid="Base_Column_List" />
+    from t_firewall_info
+    where instance_id = #{instanceId,jdbcType=VARCHAR} and status = 1
+  </select>
+
+  <select id="selectByUserId" parameterType="java.lang.String" resultMap="BaseResultMap">
+    select <include refid="Base_Column_List" />
+    from t_firewall_info
+    where user_id = #{userId,jdbcType=VARCHAR} and status = 1
+  </select>
+
+  <select id="selectByFirewallId" parameterType="java.lang.String" resultMap="BaseResultMap">
+    select <include refid="Base_Column_List" />
+    from t_firewall_info
+    where firewall_id = #{firewallId,jdbcType=VARCHAR} and status = 1
+  </select>
+
+  <delete id="deleteByPrimaryKey" parameterType="java.lang.Integer">
+    update t_firewall_info set status = 0 where id = #{id,jdbcType=INTEGER}
+  </delete>
+</mapper>

@@ -4,6 +4,7 @@ import com.core.manycloudcommon.entity.NodeImage;
 import org.apache.ibatis.annotations.Param;
 
 import java.util.List;
+import java.util.Optional;
 
 public interface NodeImageMapper {
     int deleteByPrimaryKey(Integer id);
@@ -23,4 +24,9 @@ public interface NodeImageMapper {
     int updateByPrimaryKeySelective(NodeImage record);
 
     int updateByPrimaryKey(NodeImage record);
+
+
+    List<NodeImage> selectByImageVersion(String imageVersion);
+
+//    List<NodeImage> selectByNodeId(Integer id);
 }

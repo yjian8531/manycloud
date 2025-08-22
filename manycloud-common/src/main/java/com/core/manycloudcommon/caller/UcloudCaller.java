@@ -2,8 +2,7 @@ package com.core.manycloudcommon.caller;
 
 import com.core.manycloudcommon.caller.so.*;
 import com.core.manycloudcommon.caller.vo.*;
-import com.core.manycloudcommon.entity.FinanceDetail;
-import com.core.manycloudcommon.entity.UserFinance;
+import com.core.manycloudcommon.entity.FirewallRule;
 import com.core.manycloudcommon.enums.PowerStateEnum;
 import com.core.manycloudcommon.model.AccountApi;
 import com.core.manycloudcommon.utils.CommonUtil;
@@ -393,45 +392,158 @@ public class UcloudCaller implements BaseCaller{
         }
     }
 
+//    /**
+//     * 创建防火墙
+//     * @param port 端口
+//     * @return
+//     */
+//    public String createFirewall(String name,int port) throws Exception{
+//        Map<String,String> param = new TreeMap<>();
+//        param.put("Action","CreateFirewall");
+//        param.put("PublicKey",pubKey);
+//        param.put("Region",regionId);
+//        if(StringUtils.isNotEmpty(projectId)){
+//            param.put("ProjectId",projectId);
+//        }
+//        param.put("Name",name);
+//        param.put("Rule.0","TCP|22|0.0.0.0/0|ACCEPT|HIGH|开的TCP22端口");
+//        param.put("Rule.1","UDP|22|0.0.0.0/0|ACCEPT|HIGH|开的UDP22端口");
+//        param.put("Rule.2","TCP|"+port+"|0.0.0.0/0|ACCEPT|HIGH|开的TCP"+port+"端口");
+//        param.put("Rule.3","UDP|"+port+"|0.0.0.0/0|ACCEPT|HIGH|开的UDP"+port+"端口");
+//        String signature =  getSignature(param,pivKey);
+//        param.put("Signature",signature);
+//        //log.info("请求参数："+ JSONObject.fromObject(param).toString());
+//        String str = HttpRequest.post(url,param);
+//        //log.info("响应结果："+str);
+//        JSONObject json = JSONObject.fromObject(str);
+//        if(json.getInt("RetCode") == 0){
+//            return json.getString("FWId");
+//        }else{
+//            log.info("ucloud-创建防火墙{}失败：{}",name,str);
+//            return null;
+//        }
+//    }
+
     /**
      * 创建防火墙
-     * @param port 端口
+     * @param createSecuritySO
      * @return
+     * @throws Exception
      */
-    public String createFirewall(String name,int port) throws Exception{
-        Map<String,String> param = new TreeMap<>();
-        param.put("Action","CreateFirewall");
-        param.put("PublicKey",pubKey);
-        param.put("Region",regionId);
-        if(StringUtils.isNotEmpty(projectId)){
-            param.put("ProjectId",projectId);
+    public CreateSecurityVO createFirewallTo(CreateSecuritySO createSecuritySO) throws Exception {
+        // 先获取端口字符串并校验格式和范围
+        String portStr = createSecuritySO.getPort();
+        validatePort(portStr); // 调用校验方法
+
+        Map<String, String> param = new TreeMap<>();
+        param.put("Action", "CreateFirewall");
+        param.put("PublicKey", pubKey);
+        param.put("Region", regionId);
+        if (StringUtils.isNotEmpty(projectId)) {
+            param.put("ProjectId", projectId);
         }
-        param.put("Name",name);
-        param.put("Rule.0","TCP|22|0.0.0.0/0|ACCEPT|HIGH|开的TCP22端口");
-        param.put("Rule.1","UDP|22|0.0.0.0/0|ACCEPT|HIGH|开的UDP22端口");
-        param.put("Rule.2","TCP|"+port+"|0.0.0.0/0|ACCEPT|HIGH|开的TCP"+port+"端口");
-        param.put("Rule.3","UDP|"+port+"|0.0.0.0/0|ACCEPT|HIGH|开的UDP"+port+"端口");
-        String signature =  getSignature(param,pivKey);
-        param.put("Signature",signature);
-        //log.info("请求参数："+ JSONObject.fromObject(param).toString());
-        String str = HttpRequest.post(url,param);
-        //log.info("响应结果："+str);
+        param.put("Name", createSecuritySO.getName());
+
+        // 解析动态端口，生成规则
+        List<String> dynamicPorts = parsePortString(portStr); // 解析端口字符串
+        int ruleIndex = 0; // 从 Rule.0 开始添加规则
+
+        for (String port : dynamicPorts) {
+            // 添加 TCP 和 UDP 规则
+            param.put("Rule." + ruleIndex++, "TCP|" + port + "|0.0.0.0/0|ACCEPT|HIGH|开的TCP" + port + "端口");
+            param.put("Rule." + ruleIndex++, "UDP|" + port + "|0.0.0.0/0|ACCEPT|HIGH|开的UDP" + port + "端口");
+        }
+
+        // 生成签名并调用 API
+        String signature = getSignature(param, pivKey);
+        param.put("Signature", signature);
+        String str = HttpRequest.post(url, param);
         JSONObject json = JSONObject.fromObject(str);
-        if(json.getInt("RetCode") == 0){
-            return json.getString("FWId");
-        }else{
-            log.info("ucloud-创建防火墙{}失败：{}",name,str);
+
+        if (json.getInt("RetCode") == 0) {
+            return CreateSecurityVO.builder()
+                    .code(CommonUtil.SUCCESS_CODE)
+                    .msg(CommonUtil.SUCCESS_MSG)
+                    .fwId(json.getString("FWId"))
+                    .build();
+        } else {
+            log.info("ucloud-创建防火墙{}失败：{}", createSecuritySO.getName(), str);
             return null;
+        }
+}
+
+    /**
+     * 校验端口格式合法性（支持单个端口、多个端口、端口范围）
+     */
+    private void validatePort(String portStr) {
+        // 非空校验
+        if (StringUtils.isEmpty(portStr)) {
+            throw new IllegalArgumentException("端口不能为空");
+        }
+
+        // 按逗号分割多个端口/范围
+        String[] portItems = portStr.split(",");
+        for (String item : portItems) {
+            item = item.trim();
+            if (item.isEmpty()) {
+                throw new IllegalArgumentException("端口格式错误，存在空项：" + portStr);
+            }
+
+            // 按短横线分割范围端口
+            String[] rangeParts = item.split("-");
+            if (rangeParts.length > 2) {
+                throw new IllegalArgumentException("端口格式错误，范围只能包含起始和结束值：" + item);
+            }
+
+            // 校验每个部分是否为合法端口（1-65535）
+            try {
+                for (String part : rangeParts) {
+                    int port = Integer.parseInt(part.trim());
+                    if (port < 1 || port > 65535) {
+                        throw new IllegalArgumentException("端口必须在1-65535之间，当前值：" + port);
+                    }
+                }
+                // 校验范围的起始值 <= 结束值
+                if (rangeParts.length == 2) {
+                    int start = Integer.parseInt(rangeParts[0].trim());
+                    int end = Integer.parseInt(rangeParts[1].trim());
+                    if (start > end) {
+                        throw new IllegalArgumentException("端口范围起始值不能大于结束值：" + item);
+                    }
+                }
+            } catch (NumberFormatException e) {
+                throw new IllegalArgumentException("端口必须为数字或数字范围，当前值：" + item);
+            }
         }
     }
 
     /**
-     * 查询防火墙
-     * @return
+     * 解析端口字符串为端口列表（去重）
      */
-    public String queryFirewall(String name,String fwId) throws Exception{
+    private List<String> parsePortString(String portStr) {
+        Set<String> portSet = new LinkedHashSet<>(); // 去重且保留顺序
+        String[] portItems = portStr.split(",");
+        for (String item : portItems) {
+            portSet.add(item.trim()); // 直接保留原始格式
+        }
+        return new ArrayList<>(portSet);
+    }
+
+
+
+    /**
+     * 查询防火墙
+     * @param queryFirewallSO
+     * @return
+     * @throws Exception
+     */
+    public QueryFirewallVO queryFirewall(QueryFirewallSO queryFirewallSO) throws Exception {
 
         String groupId = null;
+        String fwId = null;
+        String fwName = null;
+        List<FirewallRule> rules = new ArrayList<>(); // 用于存储规则信息（协议、端口等）
+
         Map<String,String> param = new TreeMap<>();
         param.put("Action","DescribeFirewall");
         param.put("PublicKey",pubKey);
@@ -440,44 +552,111 @@ public class UcloudCaller implements BaseCaller{
             param.put("ProjectId",projectId);
         }
         param.put("Limit","10000");
-        if(StringUtils.isNotEmpty(fwId)){
-            param.put("FWId",fwId);
+        if(StringUtils.isNotEmpty(queryFirewallSO.getFwId())){
+            param.put("FWId",queryFirewallSO.getFwId());
         }
-        String signature =  getSignature(param,pivKey);
+        String signature = getSignature(param,pivKey);
         param.put("Signature",signature);
-        //log.info("请求参数："+ JSONObject.fromObject(param).toString());
-        String str = HttpRequest.post(url,param);
-        //log.info("响应结果："+str);
 
+        String str = HttpRequest.post(url,param);
         JSONObject json = JSONObject.fromObject(str);
+
         if(json.getInt("RetCode") == 0){
             JSONArray dataArray = json.getJSONArray("DataSet");
             for(int i = 0 ; i < dataArray.size() ; i++){
                 JSONObject data = dataArray.getJSONObject(i);
-                if(StringUtils.isNotEmpty(fwId)){
-                    if(fwId.equals(data.getString("FWId"))){
-                        groupId = data.getString("GroupId");
-                        break;
-                    }
+                boolean isMatch = false;
+                if(StringUtils.isNotEmpty(queryFirewallSO.getFwId())){
+                    isMatch = queryFirewallSO.getFwId().equals(data.getString("FWId"));
                 }else{
-                    if(name.equals(data.getString("Name"))){
-                        groupId = data.getString("GroupId");
-                        break;
-                    }
+                    isMatch = queryFirewallSO.getName().equals(data.getString("Name"));
                 }
+                if (isMatch) {
+                    groupId = data.getString("GroupId");
+                    fwId = data.getString("FWId");
+                    fwName = data.getString("Name");
 
+                    // 解析规则数组，提取协议和端口
+                    JSONArray ruleArray = data.optJSONArray("Rule");
+                    if (ruleArray != null) {
+                        for (int j = 0; j < ruleArray.size(); j++) {
+                            JSONObject rule = ruleArray.getJSONObject(j);
+                            FirewallRule ruleInfo = new FirewallRule();
+                            ruleInfo.setProtocol(rule.optString("ProtocolType"));
+                            ruleInfo.setPort(rule.optString("DstPort"));
+                            ruleInfo.setAction(rule.optString("RuleAction"));
+                            ruleInfo.setPriority(rule.optString("Priority"));
+                            ruleInfo.setIpAddress(rule.optString("SrcIP"));
+                            rules.add(ruleInfo);
+                        }
+                    }
+                    break;
+                }
             }
         }
-        return groupId;
+        return QueryFirewallVO.builder()
+                .groupId(groupId)
+                .fwId(fwId)
+                .name(fwName)
+                .rules(rules) // 将解析出的规则信息设置到返回对象中
+                .code(CommonUtil.SUCCESS_CODE)
+                .msg("查询成功")
+                .build();
     }
 
+
+//    /**
+//     * 查询防火墙
+//     * @return
+//     */
+//    public String queryFirewall(String name,String fwId) throws Exception{
+//
+//        String groupId = null;
+//        Map<String,String> param = new TreeMap<>();
+//        param.put("Action","DescribeFirewall");
+//        param.put("PublicKey",pubKey);
+//        param.put("Region",regionId);
+//        if(StringUtils.isNotEmpty(projectId)){
+//            param.put("ProjectId",projectId);
+//        }
+//        param.put("Limit","10000");
+//        if(StringUtils.isNotEmpty(fwId)){
+//            param.put("FWId",fwId);
+//        }
+//        String signature =  getSignature(param,pivKey);
+//        param.put("Signature",signature);
+//        //log.info("请求参数："+ JSONObject.fromObject(param).toString());
+//        String str = HttpRequest.post(url,param);
+//        //log.info("响应结果："+str);
+//
+//        JSONObject json = JSONObject.fromObject(str);
+//        if(json.getInt("RetCode") == 0){
+//            JSONArray dataArray = json.getJSONArray("DataSet");
+//            for(int i = 0 ; i < dataArray.size() ; i++){
+//                JSONObject data = dataArray.getJSONObject(i);
+//                if(StringUtils.isNotEmpty(fwId)){
+//                    if(fwId.equals(data.getString("FWId"))){
+//                        groupId = data.getString("GroupId");
+//                        break;
+//                    }
+//                }else{
+//                    if(name.equals(data.getString("Name"))){
+//                        groupId = data.getString("GroupId");
+//                        break;
+//                    }
+//                }
+//
+//            }
+//        }
+//        return groupId;
+//    }
     /**
-     * 关联防火墙安全组信息
-     * @param groupId 防火墙ID(安全组ID)
-     * @param instanceId 主机ID
+     * 绑定防火墙
+     * @param grantFirewallSO
      * @return
+     * @throws Exception
      */
-    public boolean grantFirewall(String groupId,String instanceId) throws Exception{
+    public GrantFirewallVO grantFirewall(GrantFirewallSO grantFirewallSO) throws Exception {
         Map<String,String> param = new TreeMap<>();
         //param.put("Action","GrantFirewall");
         param.put("Action","GrantSecurityGroup");
@@ -487,21 +666,20 @@ public class UcloudCaller implements BaseCaller{
             param.put("ProjectId",projectId);
         }
         //param.put("FWId",fwId);
-        param.put("GroupId",groupId);
+        param.put("GroupId",grantFirewallSO.getGroupId());
         param.put("ResourceType","ulhost");
-        param.put("ResourceId",instanceId);
+        param.put("ResourceId",grantFirewallSO.getInstanceId());
         String signature =  getSignature(param,pivKey);
         param.put("Signature",signature);
         //log.info("请求参数："+ JSONObject.fromObject(param).toString());
         String str = HttpRequest.post(url,param);
         //log.info("响应结果："+str);
         JSONObject json = JSONObject.fromObject(str);
-        if(json.getInt("RetCode") == 0){
-            return true;
-        }else{
-            log.info("ucloud-关联防火墙安全组信息："+str);
-            return false;
-        }
+        return GrantFirewallVO.builder()
+                .success(json.getInt("RetCode") == 0)
+                .code(json.getInt("RetCode") == 0 ? CommonUtil.SUCCESS_CODE : CommonUtil.FAIL_CODE)
+                .msg(json.getInt("RetCode") == 0 ? "绑定成功" : "绑定失败: " + str)
+                .build();
     }
 
     /**
@@ -691,7 +869,6 @@ public class UcloudCaller implements BaseCaller{
                     .build();
         }
     }
-
     /**
      * 重装系统
      * @param reinstallSO
@@ -787,9 +964,8 @@ public class UcloudCaller implements BaseCaller{
             e.printStackTrace();
             return null;
         }
-
-
     }
+
 
 
 
@@ -850,5 +1026,4 @@ public class UcloudCaller implements BaseCaller{
         }
 
     }
-
 }

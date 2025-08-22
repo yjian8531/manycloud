@@ -1,5 +1,6 @@
 package com.core.manycloudservice.controller;
 
+import com.core.manycloudcommon.caller.so.CreateSecuritySO;
 import com.core.manycloudcommon.controller.BaseController;
 import com.core.manycloudcommon.entity.UserInfo;
 import com.core.manycloudcommon.utils.ResultMessage;
@@ -167,6 +168,16 @@ public class InstanceController extends BaseController {
     @PostMapping(value = "/reset",produces = {"application/json"})
     public ResultMessage reset(@RequestBody ResetSO resetSO){
         return instanceService.reset(resetSO);
+    }
+
+    /**
+     * 创建安全组
+     * @param createSecuritySO
+     * @return
+     */
+    @PostMapping(value = "/create",produces = {"application/json"})
+    public ResultMessage createSecurityGroup(@RequestBody CreateSecuritySO createSecuritySO) {
+        return instanceService.createFirewall(createSecuritySO);
     }
 
 }

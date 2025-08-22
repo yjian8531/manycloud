@@ -555,6 +555,26 @@ public class AkamaiCaller implements BaseCaller{
     }
 
 
+    public CreateSecurityVO createFirewallTo(CreateSecuritySO createSecuritySO) throws Exception {
+        return CreateSecurityVO.builder()
+                .code(CommonUtil.FAIL_CODE)
+                .msg("阿卡麦-不支持此功能")
+                .build();
+    }
 
+    @Override
+    public QueryFirewallVO queryFirewall(QueryFirewallSO queryFirewallSO) throws Exception {
+        return QueryFirewallVO.builder()
+                .code(CommonUtil.FAIL_CODE)
+                .msg("阿卡麦-不支持此功能")
+                .build();
+    }
 
+    @Override
+    public GrantFirewallVO grantFirewall(GrantFirewallSO grantFirewallSO) throws Exception {
+        return GrantFirewallVO.builder()
+                .code(CommonUtil.FAIL_CODE)
+                .msg("阿卡麦-不支持此功能")
+                .build();
+    }
 }

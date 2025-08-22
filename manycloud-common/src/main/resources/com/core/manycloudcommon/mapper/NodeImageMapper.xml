@@ -51,6 +51,13 @@
     from t_node_image
     where node_id = #{nodeId,jdbcType=INTEGER} and image_param = #{imageId,jdbcType=VARCHAR}
   </select>
+  <select id="selectByImageVersion" resultType="com.core.manycloudcommon.entity.NodeImage">
+    select
+    <include refid="Base_Column_List" />
+    from t_node_image
+    where image_version = #{imageVersion,jdbcType=VARCHAR}
+  </select>
+
 
   <delete id="deleteByPrimaryKey" parameterType="java.lang.Integer" >
     delete from t_node_image

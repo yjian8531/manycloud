@@ -2,10 +2,7 @@ package com.core.manycloudservice.service.impl;
 
 import com.core.manycloudcommon.caller.BaseCaller;
 import com.core.manycloudcommon.caller.UcloudCaller;
-import com.core.manycloudcommon.caller.so.RebootSO;
-import com.core.manycloudcommon.caller.so.ReinstallSO;
-import com.core.manycloudcommon.caller.so.StartSO;
-import com.core.manycloudcommon.caller.so.StopSO;
+import com.core.manycloudcommon.caller.so.*;
 import com.core.manycloudcommon.caller.vo.*;
 import com.core.manycloudcommon.entity.*;
 import com.core.manycloudcommon.entity.TimerTask;
@@ -22,6 +19,7 @@ import com.core.manycloudcommon.vo.instance.InstanceDetailVO;
 import com.core.manycloudcommon.vo.instance.InstanceUserVO;
 import com.core.manycloudservice.service.InstanceService;
 import com.core.manycloudservice.so.instance.*;
+import com.core.manycloudservice.so.instance.UpdatePwdSO;
 import com.github.pagehelper.Page;
 import com.github.pagehelper.PageHelper;
 import lombok.extern.slf4j.Slf4j;
@@ -76,6 +74,13 @@ public class InstanceServiceImpl implements InstanceService {
 
     @Autowired
     private NodeNetworkMapper nodeNetworkMapper;
+
+    @Autowired
+    private FirewallInfoMapper firewallInfoMapper;
+
+    @Autowired
+    private FirewallRuleMapper firewallRuleMapper;
+
 
     /***
      * 查询用户实例列表
@@ -568,7 +573,127 @@ public class InstanceServiceImpl implements InstanceService {
         }
 
     }
+    /**
+     * 创建安全组
+     * @param createSecuritySO
+     * @return
+     */
 
+    @Override
+    public ResultMessage createFirewall(CreateSecuritySO createSecuritySO) {
+        try {
+            //获取实例信息
+            InstanceInfo instanceInfo = instanceInfoMapper.selectById(createSecuritySO.getInstanceId());
+
+            if (!"UCLOUD".equals(instanceInfo.getLabel())) {
+                return new ResultMessage(ResultMessage.FAILED_CODE, "当前仅支持UCLOUD平台安全组功能");
+            }
+            //获取默认资源平台账号
+            PlatformAccount platformAccount = platformAccountMapper.selectByPrimaryKey(instanceInfo.getAccountId());
+            NodeInfo nodeInfo = nodeInfoMapper.selectByPrimaryKey(instanceInfo.getNodeId());
+
+            String projectId = null;
+            if (StringUtils.isNotEmpty(nodeInfo.getNodeParam())) {
+                JSONObject param = JSONObject.fromObject(nodeInfo.getNodeParam());
+                projectId = param.get("projectId") == null ? null : param.getString("projectId");
+            }
+
+            AccountApi accountApi = AccountApi.builder()
+                    .regionId(nodeInfo.getNodeVal())
+                    .label(instanceInfo.getLabel())
+                    .account(platformAccount.getAccount())
+                    .keyNo(platformAccount.getKeyNo())
+                    .keySecret(platformAccount.getKeySecret())
+                    .baseUrl(platformAccount.getUrl())
+                    .projectId(projectId)
+                    .build();
+
+            BaseCaller caller = BaseCaller.getCaller(accountApi);
+
+            //创建安全组
+            CreateSecurityVO createSecurityVO = caller.createFirewallTo(createSecuritySO);
+            if (createSecurityVO == null || !CommonUtil.SUCCESS_CODE.equals(createSecurityVO.getCode())) {
+                return new ResultMessage(ResultMessage.FAILED_CODE, "安全组创建失败");
+            }
+
+            //查询安全组
+            QueryFirewallSO queryFirewallSO = QueryFirewallSO.builder()
+                    .name(createSecuritySO.getName())
+                    .fwId(createSecurityVO.getFwId())
+                    .build();
+            QueryFirewallVO queryFirewallVO = caller.queryFirewall(queryFirewallSO);
+            if (queryFirewallVO == null || StringUtils.isEmpty(queryFirewallVO.getGroupId())) {
+                return new ResultMessage(ResultMessage.FAILED_CODE, "查询安全组GroupId失败");
+            }
+            String groupId = queryFirewallVO.getGroupId();
+            List<FirewallRule> rules = queryFirewallVO.getRules();
+
+            //去重 逗号分隔
+            Set<String> protocolSet = new LinkedHashSet<>();
+            Set<String> portSet = new LinkedHashSet<>();
+
+            // 遍历规则
+            if (rules != null && !rules.isEmpty()) {
+                for (FirewallRule rule : rules) {
+                    if (StringUtils.isNotEmpty(rule.getProtocol())) {
+                        protocolSet.add(rule.getProtocol());
+                    }
+                    // 保留原始格式，如 "22" 或 "1000-2000"
+                    if (StringUtils.isNotEmpty(rule.getPort())) {
+                        portSet.add(rule.getPort());
+                    }
+                }
+            }
+
+            // 拼接协议字符串（如 "TCP,UDP"）
+            String protocolStr = String.join(",", protocolSet);
+            // 拼接端口字符串（如 "22,1000-2000,8080"）
+            String portStr = String.join(",", portSet);
+
+            // 若查询无规则 则使用创建时的参数
+            if (protocolStr.isEmpty()) {
+                protocolStr = createSecuritySO.getProtocol();
+            }
+            if (portStr.isEmpty()) {
+                portStr = createSecuritySO.getPort().toString();
+            }
+
+            FirewallInfo firewallInfo = new FirewallInfo();
+            firewallInfo.setFirewallId(createSecurityVO.getFwId());// 安全组Id
+            firewallInfo.setName(createSecuritySO.getName());// 安全组名称
+            firewallInfo.setInstanceId(createSecuritySO.getInstanceId());// 实例Id
+            firewallInfo.setUserId(instanceInfo.getUserId());// 用户Id
+            firewallInfo.setPlatformLabel(instanceInfo.getLabel());// 平台标签
+            firewallInfo.setStatus(1);// 状态
+            firewallInfo.setCreateTime(new Date());
+            firewallInfo.setUpdateTime(new Date());
+            firewallInfo.setProtocol(protocolStr); // 协议
+            firewallInfo.setPort(portStr);        // 端口
+
+            firewallInfoMapper.insert(firewallInfo);
+
+            // 绑定安全组
+            GrantFirewallSO grantFirewallSO = GrantFirewallSO.builder()
+                    .groupId(groupId)
+                    .instanceId(instanceInfo.getServiceNo())
+                    .build();
+            GrantFirewallVO bindResult = caller.grantFirewall(grantFirewallSO);
+
+            if (bindResult == null || !bindResult.isSuccess()) {
+                Map<String, String> resultData = new HashMap<>();
+                resultData.put("firewallId", createSecurityVO.getFwId());
+                return new ResultMessage(ResultMessage.FAILED_CODE, "安全组创建成功但绑定失败", resultData);
+            }
+
+            Map<String, String> resultData = new HashMap<>();
+            resultData.put("firewallId", createSecurityVO.getFwId());
+            resultData.put("groupId", groupId);
+            return new ResultMessage(ResultMessage.SUCCEED_CODE, "安全组创建并绑定成功", resultData);
+        } catch (Exception e) {
+            log.error("创建安全组异常", e);
+            return new ResultMessage(ResultMessage.FAILED_CODE, "创建安全组异常：" + e.getMessage());
+        }
+    }
 
     public static void main(String[] args){
 
@@ -663,9 +788,6 @@ public class InstanceServiceImpl implements InstanceService {
             }
 
         }
-
-
-
 
         return null;
     }

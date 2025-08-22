@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.core.manycloudcommon.mapper.FirewallRuleMapper">
+  <resultMap id="BaseResultMap" type="com.core.manycloudcommon.entity.FirewallRule">
+    <id column="id" jdbcType="INTEGER" property="id" />
+    <result column="firewall_id" jdbcType="VARCHAR" property="firewallId" />
+    <result column="protocol" jdbcType="VARCHAR" property="protocol" />
+    <result column="port" jdbcType="VARCHAR" property="port" />
+    <result column="ip_address" jdbcType="VARCHAR" property="ipAddress" />
+    <result column="action" jdbcType="VARCHAR" property="action" />
+    <result column="priority" jdbcType="VARCHAR" property="priority" />
+    <result column="remark" jdbcType="VARCHAR" property="remark" />
+    <result column="create_time" jdbcType="TIMESTAMP" property="createTime" />
+    <result column="update_time" jdbcType="TIMESTAMP" property="updateTime" />
+  </resultMap>
+
+  <sql id="Base_Column_List">
+    id, firewall_id, protocol, port, ip_address, action, priority, remark, create_time, update_time
+  </sql>
+
+  <insert id="insert" parameterType="com.core.manycloudcommon.entity.FirewallRule">
+    insert into t_firewall_rule (firewall_id, protocol, port, ip_address, action, priority, remark)
+    values (#{firewallId,jdbcType=VARCHAR}, #{protocol,jdbcType=VARCHAR}, #{port,jdbcType=VARCHAR},
+            #{ipAddress,jdbcType=VARCHAR}, #{action,jdbcType=VARCHAR}, #{priority,jdbcType=VARCHAR},
+            #{remark,jdbcType=VARCHAR})
+  </insert>
+
+  <select id="selectByFirewallId" parameterType="java.lang.String" resultMap="BaseResultMap">
+    select <include refid="Base_Column_List" />
+    from t_firewall_rule
+    where firewall_id = #{firewallId,jdbcType=VARCHAR}
+  </select>
+
+  <delete id="deleteByFirewallId" parameterType="java.lang.String">
+    delete from t_firewall_rule where firewall_id = #{firewallId,jdbcType=VARCHAR}
+  </delete>
+</mapper>

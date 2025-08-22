@@ -3,9 +3,6 @@ package com.core.manycloudcommon.caller;
 import com.core.manycloudcommon.caller.so.*;
 import com.core.manycloudcommon.caller.vo.*;
 import com.core.manycloudcommon.model.AccountApi;
-import net.sf.json.JSONObject;
-
-import java.util.Arrays;
 
 public interface BaseCaller {
 
@@ -132,6 +129,33 @@ public interface BaseCaller {
      * @throws Exception
      */
     public UpdatePwdVO updatePwd(UpdatePwdSO updatePwdSO) throws Exception;
+
+
+    /**
+     * 创建安全组
+     * @param
+     * @return
+     * @throws Exception
+     */
+    public CreateSecurityVO createFirewallTo(CreateSecuritySO createSecuritySO) throws Exception;
+
+
+    /**
+     * 查询安全组
+     * @param
+     * @return
+     * @throws Exception
+     */
+    public QueryFirewallVO queryFirewall(QueryFirewallSO queryFirewallSO) throws Exception;
+
+
+    /**
+     * 绑定安全组
+     * @param
+     * @return
+     * @throws Exception
+     */
+    public GrantFirewallVO grantFirewall(GrantFirewallSO grantFirewallSO) throws Exception;
 
 
 

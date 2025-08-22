@@ -1,5 +1,6 @@
 package com.core.manycloudservice.service;
 
+import com.core.manycloudcommon.caller.so.CreateSecuritySO;
 import com.core.manycloudcommon.utils.ResultMessage;
 import com.core.manycloudservice.so.instance.*;
 import org.springframework.transaction.annotation.Transactional;
@@ -116,5 +117,10 @@ public interface InstanceService {
      * @return
      */
     ResultMessage reset(ResetSO resetSO);
+
+    /**
+     * 创建安全组
+     */
+    ResultMessage createFirewall(CreateSecuritySO createSecuritySO);
 
 }
