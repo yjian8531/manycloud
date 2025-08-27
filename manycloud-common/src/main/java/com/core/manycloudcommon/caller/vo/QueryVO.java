@@ -1,5 +1,6 @@
 package com.core.manycloudcommon.caller.vo;
 
+import com.core.manycloudcommon.caller.Item.OrderItem;
 import lombok.Builder;
 import lombok.Data;
 
@@ -17,5 +18,7 @@ public class QueryVO {
 
     /** 数据 **/
     private Map<String,QueryDetailVO> queryDetailMap;
+
+    private Integer total;
 
 }

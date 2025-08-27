@@ -555,6 +555,12 @@ public class AkamaiCaller implements BaseCaller{
     }
 
 
+    /**
+     * 创建防火墙
+     * @param createSecuritySO
+     * @return
+     * @throws Exception
+     */
     public CreateSecurityVO createFirewallTo(CreateSecuritySO createSecuritySO) throws Exception {
         return CreateSecurityVO.builder()
                 .code(CommonUtil.FAIL_CODE)
@@ -562,6 +568,12 @@ public class AkamaiCaller implements BaseCaller{
                 .build();
     }
 
+    /**
+     * 查询防火墙
+     * @param queryFirewallSO
+     * @return
+     * @throws Exception
+     */
     @Override
     public QueryFirewallVO queryFirewall(QueryFirewallSO queryFirewallSO) throws Exception {
         return QueryFirewallVO.builder()
@@ -570,6 +582,12 @@ public class AkamaiCaller implements BaseCaller{
                 .build();
     }
 
+    /**
+     * 绑定防火墙
+     * @param grantFirewallSO
+     * @return
+     * @throws Exception
+     */
     @Override
     public GrantFirewallVO grantFirewall(GrantFirewallSO grantFirewallSO) throws Exception {
         return GrantFirewallVO.builder()
@@ -577,4 +595,48 @@ public class AkamaiCaller implements BaseCaller{
                 .msg("阿卡麦-不支持此功能")
                 .build();
     }
+
+    /**
+     * 查询集群列表
+     * @param clusterListSO
+     * @return
+     * @throws Exception
+     */
+    @Override
+    public ClusterVO queryClusterList(ClusterListSO clusterListSO) throws Exception {
+        return ClusterVO.builder()
+                .code(CommonUtil.FAIL_CODE)
+                .msg("阿卡麦-不支持此功能")
+                .build();
+    }
+
+    /**
+     * 查询模板列表
+     * @param templateListSO
+     * @return
+     * @throws Exception
+     */
+    @Override
+    public TemplateListVO queryTemplateList(TemplateListSO templateListSO) throws Exception {
+        return TemplateListVO.builder()
+                .code(CommonUtil.FAIL_CODE)
+                .msg("阿卡麦-不支持此功能")
+                .build();
+    }
+
+    /**
+     * 订单支付
+     * @param orderId
+     * @return
+     * @throws Exception
+     */
+    @Override
+    public PayVO orderPay(String orderId) throws Exception {
+        return PayVO.builder()
+                .code(CommonUtil.FAIL_CODE)
+                .msg("阿卡麦-不支持此功能")
+                .build();
+    }
+
+
 }

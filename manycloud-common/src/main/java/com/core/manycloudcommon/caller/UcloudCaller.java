@@ -683,6 +683,49 @@ public class UcloudCaller implements BaseCaller{
     }
 
     /**
+     * 查询集群列表
+     * @param clusterListSO
+     * @return
+     * @throws Exception
+     */
+    @Override
+    public ClusterVO queryClusterList(ClusterListSO clusterListSO) throws Exception {
+        return ClusterVO.builder()
+                .code(CommonUtil.FAIL_CODE)
+                .msg("Ucloud-不支持此功能")
+                .build();
+    }
+
+    /**
+     * 查询模板列表
+     * @param templateListSO
+     * @return
+     * @throws Exception
+     */
+    @Override
+    public TemplateListVO queryTemplateList(TemplateListSO templateListSO) throws Exception {
+        return TemplateListVO.builder()
+                .code(CommonUtil.FAIL_CODE)
+                .msg("Ucloud-不支持此功能")
+                .build();
+    }
+
+    /**
+     * 订单支付
+     * @param orderId
+     * @return
+     * @throws Exception
+     */
+
+    @Override
+    public PayVO orderPay(String orderId) throws Exception {
+        return PayVO.builder()
+                .code(CommonUtil.FAIL_CODE)
+                .msg("Ucloud-不支持此功能")
+                .build();
+    }
+
+    /**
      * 开机
      * @param startSO
      * @return

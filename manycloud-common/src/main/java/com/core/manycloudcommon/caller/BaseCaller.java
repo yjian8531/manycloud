@@ -29,6 +29,9 @@ public interface BaseCaller {
             case "AKMPLA":
                 caller = AkamaiCaller.getClient(accountApi);
                 break;
+            case "IPLIGHT":
+                caller = IpLightCaller.getClient(accountApi);
+                break;
             default:
                 caller = null;
         }
@@ -156,6 +159,55 @@ public interface BaseCaller {
      * @throws Exception
      */
     public GrantFirewallVO grantFirewall(GrantFirewallSO grantFirewallSO) throws Exception;
+
+
+    /**
+     * 查询集群列表(Iplight)
+     * @return
+     */
+    public ClusterVO queryClusterList(ClusterListSO clusterListSO) throws Exception;
+
+    /**
+     * 获取模版列表(Iplight)
+     * @return
+     */
+    public TemplateListVO queryTemplateList(TemplateListSO templateListSO) throws Exception;
+
+    /**
+     * 服务器购买（Iplight)
+     */
+    public PayVO orderPay(String orderId) throws Exception;
+
+//    /**
+//     * 获取订单列表（Iplight)
+//     */
+//    public VpsOrderListVO vpsOrderList(QueryOrderSO queryOrderSO) throws Exception;
+//
+//    /**
+//     * 获取服务器列表（Iplight)
+//     */
+//    public VpsListVO vpsList(VpsListSO vpsListSO) throws Exception;
+
+//    /**
+//     * 开机（Iplight)
+//     */
+//    public StartIpLightVO startIpLight(String vpsCode) throws Exception;
+//
+//    /**
+//     * 关机（Iplight)
+//     */
+//    public StartIpLightVO stopIpLight(String vpsCode) throws Exception;
+
+//    /**
+//     * 续费（Iplight)
+//     */
+//    public RenewIpLightVO renewIpLight(RenewIpLightSO renewIpLightSO) throws Exception;
+//
+//    /**
+//     * 销毁（Iplight)
+//     */
+//    public StartIpLightVO unsubscribeVps(String vpsCode) throws Exception;
+
 
 
 

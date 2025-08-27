@@ -523,4 +523,41 @@ public class AwsLightSailCaller implements BaseCaller{
                 .msg("AWS-不支持此功能")
                 .build();
     }
+
+    @Override
+    public ClusterVO queryClusterList(ClusterListSO clusterListSO) throws Exception {
+        return ClusterVO.builder()
+                .code(CommonUtil.FAIL_CODE)
+                .msg("AWS-不支持此功能")
+                .build();
+    }
+
+    /**
+     * 查询模板列表
+     * @param templateListSO
+     * @return
+     * @throws Exception
+     */
+    @Override
+    public TemplateListVO queryTemplateList(TemplateListSO templateListSO) throws Exception {
+        return TemplateListVO.builder()
+                .code(CommonUtil.FAIL_CODE)
+                .msg("AWS-不支持此功能")
+                .build();
+    }
+
+    /**
+     * 订单支付
+     * @param orderId
+     * @return
+     * @throws Exception
+     */
+    @Override
+    public PayVO orderPay(String orderId) throws Exception {
+        return PayVO.builder()
+                .code(CommonUtil.FAIL_CODE)
+                .msg("AWS-不支持此功能")
+                .build();
+    }
+
 }
