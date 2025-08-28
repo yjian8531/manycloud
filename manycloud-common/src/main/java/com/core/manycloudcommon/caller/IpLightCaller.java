@@ -157,9 +157,9 @@ public class IpLightCaller implements BaseCaller {
      */
     @Override
     public QueryVO createQuery(QuerySO querySO) throws Exception {
-        // 校验订单编号必填
-        if (querySO == null || querySO.getOrderNo() == null) {
-            throw new IllegalArgumentException("订单编号（orderNo）为必填参数，不能为空");
+        // 校验实例ID集合必填且至少有一个元素
+        if (querySO == null || querySO.getInstanceIds() == null || querySO.getInstanceIds().isEmpty()) {
+            throw new IllegalArgumentException("实例ID集合（instanceIds）为必填参数，且至少包含一个实例ID");
         }
         // 创建请求头
         Map<String, String> headers = new HashMap<>();
@@ -169,16 +169,10 @@ public class IpLightCaller implements BaseCaller {
         StringBuilder urlBuilder = new StringBuilder(this.url + "/client/order/vpsOrderList");
         boolean isFirstParam = true;
         if (querySO != null) {
-            urlBuilder.append(isFirstParam ? "?" : "&").append("orderNo=").append(querySO.getOrderNo());
+            // 仅使用第一个实例ID作为查询参数（适用于单实例查询场景）
+            String firstInstanceId = querySO.getInstanceIds().get(0);
+            urlBuilder.append(isFirstParam ? "?" : "&").append("orderNo=").append(firstInstanceId);
             isFirstParam = false;
-            if (querySO.getPageNum() != null) {
-                urlBuilder.append(isFirstParam ? "?" : "&").append("pageNum=").append(querySO.getPageNum());
-                isFirstParam = false;
-            }
-            if (querySO.getPageSize() != null) {
-                urlBuilder.append(isFirstParam ? "?" : "&").append("pageSize=").append(querySO.getPageSize());
-                isFirstParam = false;
-            }
         }
         String requestUrl = urlBuilder.toString();
 
@@ -210,9 +204,7 @@ public class IpLightCaller implements BaseCaller {
                         JSONObject orderItem = orderItemsArray.getJSONObject(j);
                         if (orderItem.has("vpsCode")) {
                             QueryDetailVO queryDetailVO = new QueryDetailVO();
-                            // 映射实例ID，使用vpsCode
                             queryDetailVO.setServiceNo(orderItem.getString("vpsCode"));
-                            // 公网IP地址，假设从orderItem中获取vpsIp
                             queryDetailVO.setPublicIp(orderItem.getString("vpsIp"));
                             queryDetailVO.setPrivateIp(orderItem.getString("hostIp"));
                             queryDetailMap.put(orderItem.getString("vpsCode"), queryDetailVO);
@@ -249,9 +241,9 @@ public class IpLightCaller implements BaseCaller {
      */
     @Override
     public QueryVO query(QuerySO querySO) throws Exception {
-        // 校验vpsCode必填
-        if (querySO == null || querySO.getVpsCode() == null) {
-            throw new IllegalArgumentException("vpsCode 为必填参数，不能为空");
+        // 校验instanceIds必填且至少有一个元素
+        if (querySO == null || querySO.getInstanceIds() == null || querySO.getInstanceIds().isEmpty()) {
+            throw new IllegalArgumentException("实例ID集合（instanceIds）为必填参数，且至少包含一个实例ID");
         }
         // 创建请求头
         Map<String, String> headers = new HashMap<>();
@@ -262,17 +254,10 @@ public class IpLightCaller implements BaseCaller {
         StringBuilder urlBuilder = new StringBuilder(this.url + "/client/vps/list");
         boolean isFirstParam = true;
         if (querySO != null) {
-            // 因为vpsCode必填，所以直接拼接
-            urlBuilder.append(isFirstParam ? "?" : "&").append("vpsCode=").append(querySO.getVpsCode());
+            // 从instanceIds列表取第一个元素作为vpsCode参数值
+            String vpsCode = querySO.getInstanceIds().get(0);
+            urlBuilder.append(isFirstParam ? "?" : "&").append("vpsCode=").append(vpsCode);
             isFirstParam = false;
-            if (querySO.getPageNum() != null) {
-                urlBuilder.append(isFirstParam ? "?" : "&").append("pageNum=").append(querySO.getPageNum());
-                isFirstParam = false;
-            }
-            if (querySO.getPageSize() != null) {
-                urlBuilder.append(isFirstParam ? "?" : "&").append("pageSize=").append(querySO.getPageSize());
-                isFirstParam = false;
-            }
         }
 
         String requestUrl = urlBuilder.toString();

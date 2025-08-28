@@ -21,14 +21,5 @@ public class QuerySO {
     /** 共享带宽ID(RU需要) **/
     private String shareId;
 
-    /** 每页数量 **/
-    private Integer pageSize;
-    /** 页码 **/
-    private Integer pageNum;
-    /** 订单号 **/
-    private String orderNo;
-
-    /** VPS编码 **/
-    private String vpsCode;
 
 }
