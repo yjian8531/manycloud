@@ -169,7 +169,6 @@ public class IpLightCaller implements BaseCaller {
         StringBuilder urlBuilder = new StringBuilder(this.url + "/client/order/vpsOrderList");
         boolean isFirstParam = true;
         if (querySO != null) {
-            // 仅使用第一个实例ID作为查询参数（适用于单实例查询场景）
             String firstInstanceId = querySO.getInstanceIds().get(0);
             urlBuilder.append(isFirstParam ? "?" : "&").append("orderNo=").append(firstInstanceId);
             isFirstParam = false;
