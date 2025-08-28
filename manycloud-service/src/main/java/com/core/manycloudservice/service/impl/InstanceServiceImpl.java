@@ -688,7 +688,7 @@ public class InstanceServiceImpl implements InstanceService {
             Map<String, String> resultData = new HashMap<>();
             resultData.put("firewallId", createSecurityVO.getFwId());
             resultData.put("groupId", groupId);
-            return new ResultMessage(ResultMessage.SUCCEED_CODE, "安全组创建并绑定成功", resultData);
+            return new ResultMessage(ResultMessage.SUCCEED_CODE, "安全组创建并绑定成功");
         } catch (Exception e) {
             log.error("创建安全组异常", e);
             return new ResultMessage(ResultMessage.FAILED_CODE, "创建安全组异常：" + e.getMessage());

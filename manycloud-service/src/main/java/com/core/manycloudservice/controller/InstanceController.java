@@ -175,7 +175,7 @@ public class InstanceController extends BaseController {
      * @param createSecuritySO
      * @return
      */
-    @PostMapping(value = "/create",produces = {"application/json"})
+    @PostMapping(value = "/create/securitygroup",produces = {"application/json"})
     public ResultMessage createSecurityGroup(@RequestBody CreateSecuritySO createSecuritySO) {
         return instanceService.createFirewall(createSecuritySO);
     }
