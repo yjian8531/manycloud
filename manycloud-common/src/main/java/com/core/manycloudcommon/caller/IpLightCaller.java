@@ -103,7 +103,7 @@ public class IpLightCaller implements BaseCaller {
         orderItems.add(orderItem);
         params.put("orderItems", orderItems);
 
-       //创建订单接口
+        //创建订单接口
         String requestUrl = this.url + "/client/order/addVps";
         String response = HttpRequest.postJson(requestUrl, JSONObject.fromObject(params).toString(), headers);
         JSONObject jsonResponse = JSONObject.fromObject(response);
@@ -118,23 +118,23 @@ public class IpLightCaller implements BaseCaller {
                 if ("200".equals(payVO.getCode())) {
                     log.info("订单{}创建成功，且支付成功", orderId);
                     return CreateVO.builder()
-                            .code("200")
-                            .msg("下单成功，且支付成功")
+                            .code(CommonUtil.SUCCESS_CODE)
+                            .msg(CommonUtil.SUCCESS_MSG)
                             .data(orderId)
                             .build();
                 } else {
                     log.info("订单{}创建成功，但支付失败，失败原因：{}", orderId, payVO.getMsg());
                     return CreateVO.builder()
-                            .code("200")
-                            .msg("下单成功，但支付失败：" + payVO.getMsg())
+                            .code(CommonUtil.FAIL_CODE)
+                            .msg(CommonUtil.FAIL_MSG)
                             .data(orderId)
                             .build();
                 }
             } catch (Exception e) {
                 log.error("订单{}创建成功，但支付异常：{}", orderId, e.getMessage(), e);
                 return CreateVO.builder()
-                        .code("200")
-                        .msg("下单成功，但支付过程异常")
+                        .code(CommonUtil.FAIL_CODE)
+                        .msg(CommonUtil.FAIL_MSG)
                         .data(orderId)
                         .build();
             }
@@ -143,7 +143,7 @@ public class IpLightCaller implements BaseCaller {
             log.error("购买VPS失败: {}", errorMsg);
             return CreateVO.builder()
                     .code(CommonUtil.FAIL_CODE)
-                    .msg(errorMsg)
+                    .msg(CommonUtil.FAIL_MSG)
                     .build();
         }
     }
@@ -213,8 +213,8 @@ public class IpLightCaller implements BaseCaller {
                     }
                 }
                 return QueryVO.builder()
-                        .code("200")
-                        .msg("查询成功")
+                        .code(CommonUtil.SUCCESS_CODE)
+                        .msg(CommonUtil.SUCCESS_MSG)
                         .queryDetailMap(queryDetailMap)
                         .total(total)
                         .build();
@@ -222,7 +222,7 @@ public class IpLightCaller implements BaseCaller {
                 log.error("查询VPS订单列表失败: {}", msg);
                 return QueryVO.builder()
                         .code(CommonUtil.FAIL_CODE)
-                        .msg(msg)
+                        .msg(CommonUtil.FAIL_MSG)
                         .build();
             }
         } catch (Exception e) {
@@ -321,8 +321,8 @@ public class IpLightCaller implements BaseCaller {
                 }
 
                 return QueryVO.builder()
-                        .code("200")
-                        .msg("查询成功")
+                        .code(CommonUtil.SUCCESS_CODE)
+                        .msg(CommonUtil.SUCCESS_MSG)
                         .queryDetailMap(queryDetailMap)
                         .total(total)
                         .build();
@@ -330,7 +330,7 @@ public class IpLightCaller implements BaseCaller {
                 log.error("查询VPS列表失败: {}", msg);
                 return QueryVO.builder()
                         .code(CommonUtil.FAIL_CODE)
-                        .msg(msg)
+                        .msg(CommonUtil.FAIL_MSG)
                         .build();
             }
         } catch (Exception e) {
@@ -375,12 +375,24 @@ public class IpLightCaller implements BaseCaller {
         // 发送POST请求
         String response = HttpRequest.postJson(url, JSONObject.fromObject(params).toString(), headers);
         JSONObject responseJson = JSONObject.fromObject(response);
-        // 返回响应结果
-        return RenewVO.builder()
-                .code(responseJson.getString("code"))
-                .msg(responseJson.getString("msg"))
-                .data(responseJson.get("data"))
-                .build();
+
+        // 解析code和msg
+        int code = responseJson.getInt("code");
+        if (code == 200) {
+            // code为200，返回成功
+            return RenewVO.builder()
+                    .code(CommonUtil.SUCCESS_CODE)
+                    .msg(CommonUtil.SUCCESS_MSG)
+                    .data(responseJson.get("data"))
+                    .build();
+        } else {
+            // code不为200，返回失败
+            return RenewVO.builder()
+                    .code(CommonUtil.FAIL_CODE)
+                    .msg(CommonUtil.FAIL_MSG)
+                    .data(null)
+                    .build();
+        }
     }
 
     /**
@@ -411,22 +423,28 @@ public class IpLightCaller implements BaseCaller {
             log.info("启动VPS接口返回原始响应：{}", response);
 
             // 解析响应结果
-            JSONObject jsonResponse = JSONObject.fromObject(response);
+            JSONObject responseJson = JSONObject.fromObject(response);
 
-            // 从响应中获取code和msg字段
-            String code = jsonResponse.getString("code");
-            String msg = jsonResponse.getString("msg");
+            int code = responseJson.getInt("code");
 
-            // 封装并返回结果
-            return StartVO.builder()
-                    .code(code)
-                    .msg(msg)
-                    .build();
+            if (code == 200) {
+                // code为200，返回成功
+                return StartVO.builder()
+                        .code(CommonUtil.SUCCESS_CODE)
+                        .msg(CommonUtil.SUCCESS_MSG)
+                        .build();
+            } else {
+                // code不为200，返回失败
+                return StartVO.builder()
+                        .code(CommonUtil.FAIL_CODE)
+                        .msg(CommonUtil.FAIL_MSG)
+                        .build();
+            }
         } catch (IOException e) {
             log.error("启动VPS接口调用失败：{}", e.getMessage(), e);
             return StartVO.builder()
                     .code(CommonUtil.FAIL_CODE)
-                    .msg("启动VPS失败：" + e.getMessage())
+                    .msg(CommonUtil.FAIL_MSG)
                     .build();
         }
     }
@@ -472,26 +490,32 @@ public class IpLightCaller implements BaseCaller {
         try {
             // 发送POST请求
             String response = HttpRequest.postJson(url, JSONObject.fromObject(params).toString(), headers);
-            log.info("启动VPS接口返回原始响应：{}", response);
+            log.info("关闭VPS接口返回原始响应：{}", response);
 
             // 解析响应结果
-            JSONObject jsonResponse = JSONObject.fromObject(response);
+            JSONObject responseJson = JSONObject.fromObject(response);
 
-            // 从响应中获取code和msg字段
-            String code = jsonResponse.getString("code");
-            String msg = jsonResponse.getString("msg");
+            int code = responseJson.getInt("code");
 
-            // 封装并返回结果
-            return StopVO.builder()
-                    .code(code)
-                    .msg(msg)
-                    .build();
+            if (code == 200) {
+                // code为200，返回成功
+                return StopVO.builder()
+                        .code(CommonUtil.SUCCESS_CODE)
+                        .msg(CommonUtil.SUCCESS_MSG)
+                        .build();
+            } else {
+                // code不为200，返回失败
+                return StopVO.builder()
+                        .code(CommonUtil.FAIL_CODE)
+                        .msg(CommonUtil.FAIL_MSG)
+                        .build();
+            }
         } catch (IOException e) {
             log.error("关闭VPS接口调用失败：{}", e.getMessage(), e);
             // 异常时返回失败信息
             return StopVO.builder()
                     .code(CommonUtil.FAIL_CODE)
-                    .msg("关闭VPS失败：" + e.getMessage())
+                    .msg(CommonUtil.FAIL_MSG)
                     .build();
         }
     }
@@ -536,30 +560,35 @@ public class IpLightCaller implements BaseCaller {
         try {
             // 发送POST请求
             String response = HttpRequest.postJson(url, JSONObject.fromObject(params).toString(), headers);
-            log.info("启动VPS接口返回原始响应：{}", response);
+            log.info("销毁VPS接口返回原始响应：{}", response); // 修正日志描述
 
             // 解析响应结果
-            JSONObject jsonResponse = JSONObject.fromObject(response);
+            JSONObject responseJson = JSONObject.fromObject(response);
 
-            // 从响应中获取code和msg字段
-            String code = jsonResponse.getString("code");
-            String msg = jsonResponse.getString("msg");
-
-            // 封装并返回结果
-            return DestroyVO.builder()
-                    .code(code)
-                    .msg(msg)
-                    .build();
+            // 提取响应中的状态码和消息
+            int code = responseJson.getInt("code");
+            if (code == 200) {
+                // 响应成功时返回成功结果
+                return DestroyVO.builder()
+                        .code(CommonUtil.SUCCESS_CODE)
+                        .msg(CommonUtil.SUCCESS_MSG)
+                        .build();
+            } else {
+                // 响应失败时返回接口返回的错误信息
+                return DestroyVO.builder()
+                        .code(CommonUtil.FAIL_CODE)
+                        .msg(CommonUtil.FAIL_MSG)
+                        .build();
+            }
         } catch (IOException e) {
-            log.error("关闭VPS接口调用失败：{}", e.getMessage(), e);
+            log.error("销毁VPS接口调用失败：{}", e.getMessage(), e); // 修正日志描述
             // 异常时返回失败信息
             return DestroyVO.builder()
                     .code(CommonUtil.FAIL_CODE)
-                    .msg("关闭VPS失败：" + e.getMessage())
+                    .msg(CommonUtil.FAIL_MSG)
                     .build();
         }
     }
-
     /**
      * 设置主机自动续费标识
      *
@@ -690,8 +719,8 @@ public class IpLightCaller implements BaseCaller {
                 rows.add(item);
             }
             return ClusterVO.builder()
-                    .code("200")
-                    .msg("查询成功")
+                    .code(CommonUtil.SUCCESS_CODE)
+                    .msg(CommonUtil.SUCCESS_MSG)
                     .rows(rows)
                     .total(total)
                     .build();
@@ -700,7 +729,7 @@ public class IpLightCaller implements BaseCaller {
             log.error("查询集群列表失败: {}", errorMsg);
             return ClusterVO.builder()
                     .code(CommonUtil.FAIL_CODE)
-                    .msg(errorMsg)
+                    .msg(CommonUtil.FAIL_MSG)
                     .build();
         }
     }
@@ -779,8 +808,8 @@ public class IpLightCaller implements BaseCaller {
             }
 
             return TemplateListVO.builder()
-                    .code("200")
-                    .msg("查询成功")
+                    .code(CommonUtil.SUCCESS_CODE)
+                    .msg(CommonUtil.SUCCESS_MSG)
                     .total(total)
                     .rows(rows)
                     .build();
@@ -789,7 +818,7 @@ public class IpLightCaller implements BaseCaller {
             log.error("查询集群模板列表失败: {}", errorMsg);
             return TemplateListVO.builder()
                     .code(CommonUtil.FAIL_CODE)
-                    .msg(errorMsg)
+                    .msg(CommonUtil.FAIL_MSG)
                     .build();
         }
     }
@@ -850,15 +879,15 @@ public class IpLightCaller implements BaseCaller {
                 payData.setPayMessage(dataObj.getString("payMessage"));
 
                 return PayVO.builder()
-                        .code("200")
-                        .msg("操作成功")
+                        .code(CommonUtil.SUCCESS_CODE)
+                        .msg(CommonUtil.SUCCESS_MSG)
                         .data(payData)
                         .build();
             } else {
                 log.error("支付订单失败: {}", msg);
                 return PayVO.builder()
                         .code(CommonUtil.FAIL_CODE)
-                        .msg(msg)
+                        .msg(CommonUtil.FAIL_MSG)
                         .build();
             }
         } catch (Exception e) {
