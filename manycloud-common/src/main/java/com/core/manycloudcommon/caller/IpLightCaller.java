@@ -114,8 +114,7 @@ public class IpLightCaller implements BaseCaller {
             try {
                 //创建订单成功后，立即调用支付接口（
                 PayVO payVO = orderPay(orderId);
-                // 判断支付接口返回的code是否为200
-                if ("200".equals(payVO.getCode())) {
+                if (CommonUtil.SUCCESS_CODE.equals(payVO.getCode())) {
                     log.info("订单{}创建成功，且支付成功", orderId);
                     return CreateVO.builder()
                             .code(CommonUtil.SUCCESS_CODE)
