@@ -22,6 +22,9 @@ public class InstanceDetailVO {
     /** 私网IP **/
     private String privateIp;
 
+    /** 端口 **/
+    private Integer connectPort;
+
     /** CPU **/
     private String cpu;
 

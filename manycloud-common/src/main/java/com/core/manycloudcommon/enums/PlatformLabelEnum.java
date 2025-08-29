@@ -7,7 +7,9 @@ public enum PlatformLabelEnum {
     UCLOUD("Ucloud","UCLOUD",false,true),
     RCLOUD("Rcloud","RCLOUD",false,true),
     DOPLA("数字海洋","DOPLA",false,false),
-    AKMPLA("阿卡麦","AKMPLA",false,false);
+    AKMPLA("阿卡麦","AKMPLA",false,false),
+    IPLIGHT("IPLIGHT","IPLIGHT",false,false);
+
 
     private String name;
 

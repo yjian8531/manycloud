@@ -103,38 +103,42 @@ public class IpLightCaller implements BaseCaller {
         orderItems.add(orderItem);
         params.put("orderItems", orderItems);
 
-        //创建订单接口
+        // 调用“创建订单”接口
         String requestUrl = this.url + "/client/order/addVps";
         String response = HttpRequest.postJson(requestUrl, JSONObject.fromObject(params).toString(), headers);
         JSONObject jsonResponse = JSONObject.fromObject(response);
 
-        // 解析订单创建结果
+        // 解析“创建订单”结果
         if (jsonResponse.getInt("code") == 200) {
             String orderId = jsonResponse.getString("data");
             try {
-                //创建订单成功后，立即调用支付接口（
+                // 调用“订单支付”接口
                 PayVO payVO = orderPay(orderId);
                 if (CommonUtil.SUCCESS_CODE.equals(payVO.getCode())) {
                     log.info("订单{}创建成功，且支付成功", orderId);
+
+                    // 构造实例ID集合，放入订单号
+                    List<String> instanceIds = new ArrayList<>();
+                    instanceIds.add(orderId);
+
+                    // 封装结果：将订单号放入instanceIds返回
                     return CreateVO.builder()
                             .code(CommonUtil.SUCCESS_CODE)
                             .msg(CommonUtil.SUCCESS_MSG)
-                            .data(orderId)
+                            .instanceIds(instanceIds)
                             .build();
                 } else {
                     log.info("订单{}创建成功，但支付失败，失败原因：{}", orderId, payVO.getMsg());
                     return CreateVO.builder()
                             .code(CommonUtil.FAIL_CODE)
                             .msg(CommonUtil.FAIL_MSG)
-                            .data(orderId)
                             .build();
                 }
             } catch (Exception e) {
-                log.error("订单{}创建成功，但支付异常：{}", orderId, e.getMessage(), e);
+                log.error("订单{}创建成功，但支付/查询异常：{}", orderId, e.getMessage(), e);
                 return CreateVO.builder()
                         .code(CommonUtil.FAIL_CODE)
                         .msg(CommonUtil.FAIL_MSG)
-                        .data(orderId)
                         .build();
             }
         } else {
@@ -156,78 +160,87 @@ public class IpLightCaller implements BaseCaller {
      */
     @Override
     public QueryVO createQuery(QuerySO querySO) throws Exception {
-        // 校验实例ID集合必填且至少有一个元素
+        //  校验入参：必须传入订单号
         if (querySO == null || querySO.getInstanceIds() == null || querySO.getInstanceIds().isEmpty()) {
-            throw new IllegalArgumentException("实例ID集合（instanceIds）为必填参数，且至少包含一个实例ID");
+            throw new IllegalArgumentException("实例ID集合（instanceIds）为必填参数，且至少包含一个订单号");
         }
-        // 创建请求头
+        String orderId = querySO.getInstanceIds().get(0);
+        log.info("开始处理订单{}的查询：订单号→vpsCode→主机信息", orderId);
+
+        // 2. 调用订单接口：用订单号查询vpsCode、公网IP、私网IP
         Map<String, String> headers = new HashMap<>();
         headers.put("x-merchant-token", pubKey);
         headers.put("x-merchant-code", pivKey);
 
+        // 构建订单查询URL
         StringBuilder urlBuilder = new StringBuilder(this.url + "/client/order/vpsOrderList");
-        boolean isFirstParam = true;
-        if (querySO != null) {
-            String firstInstanceId = querySO.getInstanceIds().get(0);
-            urlBuilder.append(isFirstParam ? "?" : "&").append("orderNo=").append(firstInstanceId);
-            isFirstParam = false;
+        urlBuilder.append("?orderNo=").append(orderId);
+        String orderQueryUrl = urlBuilder.toString();
+
+        // 发送请求并获取响应
+        String orderResponse = HttpRequest.get(orderQueryUrl, headers);
+        log.info("订单{}查询接口返回原始响应：{}", orderId, orderResponse);
+        JSONObject orderJson = JSONObject.fromObject(orderResponse);
+
+        // 校验订单查询响应状态
+        if (orderJson.getInt("code") != 200) {
+            String errorMsg = "订单" + orderId + "查询失败：" + orderJson.getString("msg");
+            log.error(errorMsg);
+            throw new Exception(errorMsg);
         }
-        String requestUrl = urlBuilder.toString();
 
-        try {
-            // 发送 GET 请求
-            String response = HttpRequest.get(requestUrl, headers);
-
-            log.info("VPS订单列表查询接口返回原始响应：{}", response);
-
-            // 解析响应结果
-            JSONObject jsonResponse = JSONObject.fromObject(response);
-
-            if (!jsonResponse.has("code")) {
-                String errorMsg = "响应缺少 code 字段，响应：" + response;
-                log.error(errorMsg);
-                throw new Exception(errorMsg);
-            }
-
-            int code = jsonResponse.getInt("code");
-            String msg = jsonResponse.getString("msg");
-            if (code == 200) {
-                int total = jsonResponse.getInt("total");
-                JSONArray rowsArray = jsonResponse.getJSONArray("rows");
-                Map<String, QueryDetailVO> queryDetailMap = new HashMap<>();
-                for (int i = 0; i < rowsArray.size(); i++) {
-                    JSONObject row = rowsArray.getJSONObject(i);
-                    JSONArray orderItemsArray = row.getJSONArray("orderItems");
-                    for (int j = 0; j < orderItemsArray.size(); j++) {
-                        JSONObject orderItem = orderItemsArray.getJSONObject(j);
-                        if (orderItem.has("vpsCode")) {
-                            QueryDetailVO queryDetailVO = new QueryDetailVO();
-                            queryDetailVO.setServiceNo(orderItem.getString("vpsCode"));
-                            queryDetailVO.setPublicIp(orderItem.getString("vpsIp"));
-                            queryDetailVO.setPrivateIp(orderItem.getString("hostIp"));
-                            queryDetailMap.put(orderItem.getString("vpsCode"), queryDetailVO);
-                        } else {
-                            log.warn("orderItem 中不存在 vpsCode 字段，当前 orderItem 数据：{}", orderItem.toString());
-                        }
-                    }
-                }
-                return QueryVO.builder()
-                        .code(CommonUtil.SUCCESS_CODE)
-                        .msg(CommonUtil.SUCCESS_MSG)
-                        .queryDetailMap(queryDetailMap)
-                        .total(total)
-                        .build();
-            } else {
-                log.error("查询VPS订单列表失败: {}", msg);
-                return QueryVO.builder()
-                        .code(CommonUtil.FAIL_CODE)
-                        .msg(CommonUtil.FAIL_MSG)
-                        .build();
-            }
-        } catch (Exception e) {
-            log.error("查询VPS订单列表异常: {}", e.getMessage(), e);
-            throw e;
+        // 解析订单数据获取vpsCode及IP信息
+        JSONArray orderRows = orderJson.getJSONArray("rows");
+        if (orderRows.isEmpty()) {
+            throw new Exception("订单" + orderId + "未查询到关联实例");
         }
+        JSONObject orderRow = orderRows.getJSONObject(0);
+        JSONArray orderItems = orderRow.getJSONArray("orderItems");
+        if (orderItems.isEmpty()) {
+            throw new Exception("订单" + orderId + "未查询到实例详情（orderItems为空）");
+        }
+        JSONObject item = orderItems.getJSONObject(0);
+        if (!item.has("vpsCode")) {
+            throw new Exception("订单" + orderId + "未查询到vpsCode（orderItem中无该字段）");
+        }
+
+        // 提取订单查询关键信息
+        String vpsCode = item.getString("vpsCode");
+        String publicIp = item.getString("vpsIp");
+//        String privateIp = item.getString("hostIp");
+        log.info("订单{}查询到vpsCode：{}，公网IP：{}，私网IP：{}", orderId, vpsCode, publicIp);
+
+        // 3. 调用query方法：用vpsCode查询主机详细信息
+        QuerySO vpsQuerySO = new QuerySO();
+        List<String> vpsInstanceIds = new ArrayList<>();
+        vpsInstanceIds.add(vpsCode);
+        vpsQuerySO.setInstanceIds(vpsInstanceIds);
+
+        QueryVO vpsQueryVO = query(vpsQuerySO);
+        log.info("vpsCode{}查询主机信息返回结果：{}", vpsCode, vpsQueryVO);
+
+        // 校验主机信息查询结果
+        if (!CommonUtil.SUCCESS_CODE.equals(vpsQueryVO.getCode())
+                || vpsQueryVO.getQueryDetailMap() == null
+                || !vpsQueryVO.getQueryDetailMap().containsKey(vpsCode)) {
+            throw new Exception("vpsCode" + vpsCode + "查询主机信息失败：" + vpsQueryVO.getMsg());
+        }
+
+        // 4. 合并信息：补充IP信息并更新实例ID
+        QueryDetailVO fullHostInfo = vpsQueryVO.getQueryDetailMap().get(vpsCode);
+        fullHostInfo.setPublicIp(publicIp);
+//        fullHostInfo.setPrivateIp(privateIp);
+        fullHostInfo.setServiceNo(vpsCode);
+
+        // 5. 构建最终返回结果
+        Map<String, QueryDetailVO> finalResultMap = new HashMap<>();
+        finalResultMap.put(orderId, fullHostInfo);
+
+        return QueryVO.builder()
+                .code(CommonUtil.SUCCESS_CODE)
+                .msg(CommonUtil.SUCCESS_MSG)
+                .queryDetailMap(finalResultMap)
+                .build();
     }
 
     /**
@@ -323,7 +336,6 @@ public class IpLightCaller implements BaseCaller {
                         .code(CommonUtil.SUCCESS_CODE)
                         .msg(CommonUtil.SUCCESS_MSG)
                         .queryDetailMap(queryDetailMap)
-                        .total(total)
                         .build();
             } else {
                 log.error("查询VPS列表失败: {}", msg);
@@ -588,6 +600,7 @@ public class IpLightCaller implements BaseCaller {
                     .build();
         }
     }
+
     /**
      * 设置主机自动续费标识
      *

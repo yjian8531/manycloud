@@ -114,6 +114,7 @@ public class InstanceServiceImpl implements InstanceService {
                 .nodeName(nodeName)
                 .publicIp(instanceInfo.getPublicIp())
                 .privateIp(instanceInfo.getPrivateIp())
+                .connectPort(instanceInfo.getConnectPort())
                 .cpu(instanceInfo.getCpu())
                 .ram(instanceInfo.getRam())
                 .account(instanceInfo.getConnectAccount())

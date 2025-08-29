@@ -21,6 +21,7 @@ import com.core.manycloudcommon.utils.DateUtil;
 import com.core.manycloudcommon.utils.HttpRequest;
 import com.core.manycloudcommon.utils.StringUtils;
 import com.core.manycloudtimer.util.WeiXinCaller;
+//import lombok.extern.slf4j.Slf4j;
 import lombok.extern.slf4j.Slf4j;
 import net.sf.json.JSONObject;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -176,7 +177,11 @@ public class CreateInstanceTimer {
 
                         }else{
                             /** 实例创建完成 **/
-                            complete(instanceInfo,serviceNo,queryDetail,nodeInfo.getNodeName());
+//                            complete(instanceInfo,serviceNo,queryDetail,nodeInfo.getNodeName());
+
+                            // 传入vpsCode
+                            complete(instanceInfo, queryDetail.getServiceNo(), queryDetail, nodeInfo.getNodeName());
+
 
                         }
 
@@ -353,7 +358,10 @@ public class CreateInstanceTimer {
     private void complete(InstanceInfo instanceInfo,String serviceNo,QueryDetailVO queryDetail,String nodeName){
         instanceInfo.setConnectPort(queryDetail.getPort());
         instanceInfo.setConnectAccount(queryDetail.getAccount());
-        instanceInfo.setServiceNo(serviceNo);
+
+//        instanceInfo.setServiceNo(serviceNo);
+
+        instanceInfo.setServiceNo(queryDetail.getServiceNo());
         if(StringUtils.isNotEmpty(queryDetail.getPwd())){
             instanceInfo.setConnectPwd(queryDetail.getPwd());
         }
