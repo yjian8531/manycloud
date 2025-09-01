@@ -160,29 +160,28 @@ public class IpLightCaller implements BaseCaller {
      */
     @Override
     public QueryVO createQuery(QuerySO querySO) throws Exception {
-        //  校验入参：必须传入订单号
         if (querySO == null || querySO.getInstanceIds() == null || querySO.getInstanceIds().isEmpty()) {
             throw new IllegalArgumentException("实例ID集合（instanceIds）为必填参数，且至少包含一个订单号");
         }
         String orderId = querySO.getInstanceIds().get(0);
         log.info("开始处理订单{}的查询：订单号→vpsCode→主机信息", orderId);
 
-        // 2. 调用订单接口：用订单号查询vpsCode、公网IP、私网IP
+        // 调用订单接口：用订单号查询vpsCode、公网IP
         Map<String, String> headers = new HashMap<>();
         headers.put("x-merchant-token", pubKey);
         headers.put("x-merchant-code", pivKey);
 
         // 构建订单查询URL
-        StringBuilder urlBuilder = new StringBuilder(this.url + "/client/order/vpsOrderList");
-        urlBuilder.append("?orderNo=").append(orderId);
-        String orderQueryUrl = urlBuilder.toString();
+        StringBuilder orderUrlBuilder = new StringBuilder(this.url + "/client/order/vpsOrderList");
+        orderUrlBuilder.append("?orderNo=").append(orderId);
+        String orderQueryUrl = orderUrlBuilder.toString();
 
         // 发送请求并获取响应
         String orderResponse = HttpRequest.get(orderQueryUrl, headers);
         log.info("订单{}查询接口返回原始响应：{}", orderId, orderResponse);
         JSONObject orderJson = JSONObject.fromObject(orderResponse);
 
-        // 校验订单查询响应状态
+        // 第一步：判断订单接口返回code是否成功
         if (orderJson.getInt("code") != 200) {
             String errorMsg = "订单" + orderId + "查询失败：" + orderJson.getString("msg");
             log.error(errorMsg);
@@ -207,40 +206,79 @@ public class IpLightCaller implements BaseCaller {
         // 提取订单查询关键信息
         String vpsCode = item.getString("vpsCode");
         String publicIp = item.getString("vpsIp");
-//        String privateIp = item.getString("hostIp");
-        log.info("订单{}查询到vpsCode：{}，公网IP：{}，私网IP：{}", orderId, vpsCode, publicIp);
+        log.info("订单{}查询到vpsCode：{}，公网IP：{}", orderId, vpsCode, publicIp);
 
-        // 3. 调用query方法：用vpsCode查询主机详细信息
-        QuerySO vpsQuerySO = new QuerySO();
-        List<String> vpsInstanceIds = new ArrayList<>();
-        vpsInstanceIds.add(vpsCode);
-        vpsQuerySO.setInstanceIds(vpsInstanceIds);
+        //调用 /client/vps/list 接口查询主机详细信息
+        StringBuilder vpsUrlBuilder = new StringBuilder(this.url + "/client/vps/list");
+        vpsUrlBuilder.append("?vpsCode=").append(vpsCode);
+        String vpsQueryUrl = vpsUrlBuilder.toString();
 
-        QueryVO vpsQueryVO = query(vpsQuerySO);
-        log.info("vpsCode{}查询主机信息返回结果：{}", vpsCode, vpsQueryVO);
+        try {
+            // 发送 GET 请求
+            String vpsResponse = HttpRequest.get(vpsQueryUrl, headers);
+            log.info("VPS列表查询接口返回原始响应：{}", vpsResponse);
 
-        // 校验主机信息查询结果
-        if (!CommonUtil.SUCCESS_CODE.equals(vpsQueryVO.getCode())
-                || vpsQueryVO.getQueryDetailMap() == null
-                || !vpsQueryVO.getQueryDetailMap().containsKey(vpsCode)) {
-            throw new Exception("vpsCode" + vpsCode + "查询主机信息失败：" + vpsQueryVO.getMsg());
+            // 解析响应结果
+            JSONObject vpsJsonResponse = JSONObject.fromObject(vpsResponse);
+            // 判断主机信息接口返回code是否成功
+            int code = vpsJsonResponse.getInt("code");
+            String msg = vpsJsonResponse.getString("msg");
+            if (code != 200) {
+                log.error("查询VPS列表失败: {}", msg);
+                throw new Exception("查询VPS列表失败: " + msg);
+            }
+            // 接口调用成功，处理返回数据
+            JSONArray rowsArray = vpsJsonResponse.getJSONArray("rows");
+            if (rowsArray.isEmpty()) {
+                throw new Exception("未查询到vpsCode=" + vpsCode + "的主机信息");
+            }
+            JSONObject row = rowsArray.getJSONObject(0);
+
+            // 获取并判断主机状态
+            int serverStatus = row.getInt("status");
+            log.info("vpsCode={}的主机当前状态码：{}", vpsCode, serverStatus);
+
+            // 创建查询详情对象
+            QueryDetailVO queryDetailVO = new QueryDetailVO();
+            queryDetailVO.setServiceNo(vpsCode);
+            queryDetailVO.setPublicIp(publicIp);
+
+            // 仅当状态为运行中(20)时，才获取完整数据
+            if (serverStatus == 20) {
+                // 运行中状态：设置所有信息，状态为成功（1）
+                queryDetailVO.setAccount(row.getString("sshAccount")); // 账号
+                queryDetailVO.setPort(row.getInt("sshPort"));         // 端口
+                queryDetailVO.setPwd(row.getString("sshPwd"));        // 密码
+                queryDetailVO.setStatus(1);                           // 成功
+                queryDetailVO.setPowerState("running");               // 运行中状态描述
+            } else {
+                // 非运行中状态：只设置状态信息
+                if (serverStatus == 0 || serverStatus == 10 || serverStatus == 21 || serverStatus == 25) {
+                    queryDetailVO.setStatus(0); // 待定（对应启动中状态）
+                    queryDetailVO.setPowerState("execution");
+                } else if (serverStatus == 30 || serverStatus == 35) {
+                    queryDetailVO.setStatus(2); // 失败（对应关机中状态）
+                    queryDetailVO.setPowerState("halted");
+                } else if (serverStatus == 40 || serverStatus == 50 || serverStatus == 55 || serverStatus == 60 || serverStatus == 70) {
+                    queryDetailVO.setStatus(2); // 失败（对应关机状态）
+                    queryDetailVO.setPowerState("halted");
+                }
+            }
+
+            // 构建最终返回结果
+            Map<String, QueryDetailVO> finalResultMap = new HashMap<>();
+            finalResultMap.put(orderId, queryDetailVO);
+
+            return QueryVO.builder()
+                    .code(CommonUtil.SUCCESS_CODE)
+                    .msg(CommonUtil.SUCCESS_MSG)
+                    .queryDetailMap(finalResultMap)
+                    .build();
+
+        } catch (Exception e) {
+            log.error("查询VPS列表异常: {}", e.getMessage(), e);
+            throw e;
         }
-
-        // 4. 合并信息：补充IP信息并更新实例ID
-        QueryDetailVO fullHostInfo = vpsQueryVO.getQueryDetailMap().get(vpsCode);
-        fullHostInfo.setPublicIp(publicIp);
-//        fullHostInfo.setPrivateIp(privateIp);
-        fullHostInfo.setServiceNo(vpsCode);
-
-        // 5. 构建最终返回结果
-        Map<String, QueryDetailVO> finalResultMap = new HashMap<>();
-        finalResultMap.put(orderId, fullHostInfo);
-
-        return QueryVO.builder()
-                .code(CommonUtil.SUCCESS_CODE)
-                .msg(CommonUtil.SUCCESS_MSG)
-                .queryDetailMap(finalResultMap)
-                .build();
     }
 
     /**
@@ -252,7 +290,6 @@ public class IpLightCaller implements BaseCaller {
      */
     @Override
     public QueryVO query(QuerySO querySO) throws Exception {
-        // 校验instanceIds必填且至少有一个元素
         if (querySO == null || querySO.getInstanceIds() == null || querySO.getInstanceIds().isEmpty()) {
             throw new IllegalArgumentException("实例ID集合（instanceIds）为必填参数，且至少包含一个实例ID");
         }
@@ -260,7 +297,6 @@ public class IpLightCaller implements BaseCaller {
         Map<String, String> headers = new HashMap<>();
         headers.put("x-merchant-token", pubKey);
         headers.put("x-merchant-code", pivKey);
-
 
         StringBuilder urlBuilder = new StringBuilder(this.url + "/client/vps/list");
         boolean isFirstParam = true;
@@ -282,68 +318,65 @@ public class IpLightCaller implements BaseCaller {
             // 解析响应结果
             JSONObject jsonResponse = JSONObject.fromObject(response);
 
+            // 判断响应是否包含code字段
             if (!jsonResponse.has("code")) {
                 String errorMsg = "响应缺少 code 字段，响应：" + response;
                 log.error(errorMsg);
                 throw new Exception(errorMsg);
             }
 
+            //判断接口返回code是否为200
             int code = jsonResponse.getInt("code");
             String msg = jsonResponse.getString("msg");
-
-            if (code == 200) {
-                int total = jsonResponse.getInt("total");
-                JSONArray rowsArray = jsonResponse.getJSONArray("rows");
-
-                Map<String, QueryDetailVO> queryDetailMap = new HashMap<>();
-                for (int i = 0; i < rowsArray.size(); i++) {
-                    JSONObject row = rowsArray.getJSONObject(i);
-                    QueryDetailVO queryDetailVO = new QueryDetailVO();
-                    // 映射实例ID，使用vpsCode
-                    queryDetailVO.setServiceNo(row.getString("vpsCode"));
-                    // 公网IP地址
-                    queryDetailVO.setPublicIp(row.getString("vpsIp"));
-                    // 账号，使用sshAccount
-                    queryDetailVO.setAccount(row.getString("sshAccount"));
-                    // 端口，使用sshPort
-                    queryDetailVO.setPort(row.getInt("sshPort"));
-                    // 密码，使用sshPwd
-                    queryDetailVO.setPwd(row.getString("sshPwd"));
-
-                    // 处理状态转换
-                    int serverStatus = row.getInt("status");
-                    if (serverStatus == 20) {
-                        queryDetailVO.setStatus(1); // 成功
-                    } else if (serverStatus == 0) {
-                        queryDetailVO.setStatus(0); // 待定
-                    } else {
-                        queryDetailVO.setStatus(2); // 失败
-                    }
-
-                    // 根据status设置powerState
-                    if (serverStatus == 20) {
-                        queryDetailVO.setPowerState("running");
-                    } else if (serverStatus == 0) {
-                        queryDetailVO.setPowerState("execution");
-                    } else {
-                        queryDetailVO.setPowerState("halted");
-                    }
-
-                    queryDetailMap.put(row.getString("vpsCode"), queryDetailVO);
-                }
-
-                return QueryVO.builder()
-                        .code(CommonUtil.SUCCESS_CODE)
-                        .msg(CommonUtil.SUCCESS_MSG)
-                        .queryDetailMap(queryDetailMap)
-                        .build();
-            } else {
+            if (code != 200) {
                 log.error("查询VPS列表失败: {}", msg);
                 return QueryVO.builder()
                         .code(CommonUtil.FAIL_CODE)
                         .msg(CommonUtil.FAIL_MSG)
                         .build();
             }
+
+            // 接口调用成功，继续处理数据
+            JSONArray rowsArray = jsonResponse.getJSONArray("rows");
+
+            Map<String, QueryDetailVO> queryDetailMap = new HashMap<>();
+            for (int i = 0; i < rowsArray.size(); i++) {
+                JSONObject row = rowsArray.getJSONObject(i);
+                QueryDetailVO queryDetailVO = new QueryDetailVO();
+                queryDetailVO.setServiceNo(row.getString("vpsCode"));
+                queryDetailVO.setPublicIp(row.getString("vpsIp"));
+                // 获取主机状态码
+                int serverStatus = row.getInt("status");
+                //仅当状态为运行中(20)时，才获取完整数据
+                if (serverStatus == 20) {
+                    // 运行中状态：设置所有信息，状态为成功（1）
+                    queryDetailVO.setAccount(row.getString("sshAccount")); // 账号
+                    queryDetailVO.setPort(row.getInt("sshPort"));         // 端口
+                    queryDetailVO.setPwd(row.getString("sshPwd"));        // 密码
+                    queryDetailVO.setStatus(1);                           // 成功
+                    queryDetailVO.setPowerState("running");               // 运行中状态描述
+                } else {
+                    // 非运行中状态：只设置状态信息，
+                    if (serverStatus == 0 || serverStatus == 10 || serverStatus == 21 || serverStatus == 25) {
+                        queryDetailVO.setStatus(0); // 待定（对应启动中状态）
+                        queryDetailVO.setPowerState("execution");
+                    } else if (serverStatus == 30 || serverStatus == 35) {
+                        queryDetailVO.setStatus(2); // 失败（对应关机中状态）
+                        queryDetailVO.setPowerState("halted");
+                    } else if (serverStatus == 40 || serverStatus == 50 || serverStatus == 55 || serverStatus == 60 || serverStatus == 70) {
+                        queryDetailVO.setStatus(2); // 失败（对应关机状态）
+                        queryDetailVO.setPowerState("halted");
+                    }
+                }
+                queryDetailMap.put(row.getString("vpsCode"), queryDetailVO);
+            }
+
+            return QueryVO.builder()
+                    .code(CommonUtil.SUCCESS_CODE)
+                    .msg(CommonUtil.SUCCESS_MSG)
+                    .queryDetailMap(queryDetailMap)
+                    .build();
+
         } catch (Exception e) {
             log.error("查询VPS列表异常: {}", e.getMessage(), e);
             throw e;
