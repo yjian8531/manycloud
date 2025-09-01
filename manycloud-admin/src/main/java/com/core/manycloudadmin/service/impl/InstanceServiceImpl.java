@@ -373,6 +373,7 @@ public class InstanceServiceImpl implements InstanceService {
                     InstanceInfo entity = new InstanceInfo();
                     entity.setId(instanceInfo.getId());
                     entity.setEndTime(newEndTime);
+                    entity.setStatus(3);//使用中状态
                     entity.setUpdateTime(new Date());
                     instanceInfoMapper.updateByPrimaryKeySelective(entity);
 
