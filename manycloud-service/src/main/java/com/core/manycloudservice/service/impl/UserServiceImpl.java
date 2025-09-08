@@ -59,6 +59,15 @@ public class UserServiceImpl implements UserService {
     @Autowired
     private MedalInfoMapper medalInfoMapper;
 
+    @Autowired
+    private VoucherInfoMapper voucherInfoMapper;
+
+    @Autowired
+    private VoucherBindMapper voucherBindMapper;
+
+    @Autowired
+    private VoucherProductMapper voucherProductMapper;
+
 
     /**
      * 用户注册
@@ -115,6 +124,9 @@ public class UserServiceImpl implements UserService {
                 userPro.setStatus(CommonUtil.STATUS_0);
                 userPro.setCreateTime(new Date());
                 userProMapper.insertSelective(userPro);
+
+                /** 代金券赠送校验 **/
+                checkVoucherBind(userInfo.getUserId(),proUser.getUserId());
             }
 
             if(StringUtils.isNotEmpty(registerSO.getOpenId())){
@@ -434,6 +446,42 @@ public class UserServiceImpl implements UserService {
             }
         }
         return targetLevel;
+    }
+
+
+    /***
+     * 校验代金券赠送
+     * @param userId 注册用户ID
+     * @param proUserId 推广用户ID
+     */
+    private void checkVoucherBind(String userId,String proUserId){
+
+        /** 获取推广用户绑定的赠送代金券产品 **/
+        List<VoucherBind> voucherBindList = voucherBindMapper.selectByUserId(proUserId);
+
+        for(VoucherBind voucherBind : voucherBindList){
+
+            VoucherProduct voucherProduct = voucherProductMapper.selectByPrimaryKey(voucherBind.getProductId());
+            if(voucherProduct.getStatus() == 1){
+                /** 代金券产品无效状态 **/
+                continue;
+            }
+
+            /** 添加注册用户代金券信息 **/
+            VoucherInfo voucherInfo = new VoucherInfo();
+            voucherInfo.setUserId(userId);
+            voucherInfo.setProductId(voucherProduct.getId());
+            voucherInfo.setTotalAmount(voucherProduct.getTotalAmount());
+            voucherInfo.setSurplusAmount(voucherProduct.getTotalAmount());
+            voucherInfo.setStartTime(voucherProduct.getStartTime());
+            voucherInfo.setEndTime(voucherProduct.getEndTime());
+            voucherInfo.setStatus(0);
+            voucherInfo.setCreateTime(new Date());
+            voucherInfo.setUpdateTime(new Date());
+            voucherInfoMapper.insertSelective(voucherInfo);
+
+        }
+
     }
 
 }

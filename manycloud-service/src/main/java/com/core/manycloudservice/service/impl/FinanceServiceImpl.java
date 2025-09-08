@@ -7,6 +7,7 @@ import com.core.manycloudcommon.utils.ResultMessage;
 import com.core.manycloudcommon.vo.finance.*;
 import com.core.manycloudservice.service.FinanceService;
 import com.core.manycloudservice.so.finance.*;
+import com.core.manycloudservice.vo.VoucherVO;
 import com.github.pagehelper.Page;
 import com.github.pagehelper.PageHelper;
 import lombok.extern.slf4j.Slf4j;
@@ -79,6 +80,19 @@ public class FinanceServiceImpl implements FinanceService {
 
     @Autowired
     public Environment env;
+
+
+    @Autowired
+    private VoucherInfoMapper voucherInfoMapper;
+
+    @Autowired
+    private VoucherBindMapper voucherBindMapper;
+
+    @Autowired
+    private VoucherProductMapper voucherProductMapper;
+
+    @Autowired
+    private VoucherLogMapper voucherLogMapper;
 
 
     /**
@@ -437,6 +451,122 @@ public class FinanceServiceImpl implements FinanceService {
         resultMap.put("total",page.getTotal());
         resultMap.put("list",page.getResult());
         return new ResultMessage(ResultMessage.SUCCEED_CODE,ResultMessage.SUCCEED_MSG,resultMap);
+    }
+
+
+    /**
+     * 查询用户代金券使用情况
+     * @param userId 用户ID
+     * @return
+     */
+    public VoucherVO queryVoucher(String userId){
+
+        VoucherInfo voucherInfo = voucherInfoMapper.selectByUserId(userId);
+        if(voucherInfo != null){
+
+            if(voucherInfo.getStartTime() != null && new Date().getTime() < voucherInfo.getStartTime().getTime()){
+                //代金券生效时间未到
+                VoucherVO voucherVO = VoucherVO.builder().status(1).build();
+                return voucherVO;
+            }
+
+            if(voucherInfo.getEndTime() != null && new Date().getTime() > voucherInfo.getStartTime().getTime()){
+                //代金券生效时间已过
+                VoucherVO voucherVO = VoucherVO.builder().status(1).build();
+                return voucherVO;
+            }
+
+            if(voucherInfo.getSurplusAmount().compareTo(BigDecimal.valueOf(0)) < 1){
+                //代金券剩余使用金额不足
+                voucherInfo.setStatus(1);
+                voucherInfo.setUpdateTime(new Date());
+                voucherInfoMapper.updateByPrimaryKeySelective(voucherInfo);
+                VoucherVO voucherVO = VoucherVO.builder().status(1).build();
+                return voucherVO;
+            }
+
+            VoucherProduct voucherProduct = voucherProductMapper.selectByPrimaryKey(voucherInfo.getProductId());
+
+            if(voucherProduct.getType() == 1){//单次金额使用限制
+
+                BigDecimal amount = voucherProduct.getLimitAmount();
+                if(voucherInfo.getSurplusAmount().compareTo(amount) < 0){//代金券剩余金额 小于 单次使用金额
+                    amount = voucherInfo.getSurplusAmount();
+                }
+                VoucherVO voucherVO = VoucherVO.builder()
+                        .status(0)
+                        .id(voucherInfo.getId())
+                        .amount(amount)
+                        .build();
+                return voucherVO;
+
+
+            }else if(voucherProduct.getType() == 0){//无限制使用
+                BigDecimal amount = voucherInfo.getSurplusAmount();
+                VoucherVO voucherVO = VoucherVO.builder()
+                        .status(0)
+                        .id(voucherInfo.getId())
+                        .amount(amount)
+                        .build();
+                return voucherVO;
+
+            }else{
+                VoucherVO voucherVO = VoucherVO.builder().status(1).build();
+                return voucherVO;
+            }
+
+
+        }else{
+            VoucherVO voucherVO = VoucherVO.builder().status(1).build();
+            return voucherVO;
+        }
+
+    }
+
+
+    /**
+     * 使用代金券
+     * @param id 代金券ID
+     * @param amount 使用金额
+     * @param instanceId 实例ID
+     * @param tag 标签(buy:购买,renew:续费)
+     * @return
+     */
+    public boolean useVoucher(Integer id,BigDecimal amount,String instanceId,String tag){
+
+
+        VoucherInfo voucherInfo = voucherInfoMapper.selectByPrimaryKey(id);
+
+        /** 代金券剩余金额 **/
+        BigDecimal surplusAmount = voucherInfo.getSurplusAmount();
+
+        if(surplusAmount.compareTo(amount) < 0){
+            log.info("用户[{}]-[{}]-主机[{}] ---->失败：代金券余额不足！！",id,tag,instanceId);
+            return false;
+        }
+
+        BigDecimal sy = surplusAmount.subtract(amount);
+        if(sy.compareTo(BigDecimal.valueOf(0)) < 1){
+            voucherInfo.setStatus(1);
+        }
+        voucherInfo.setSurplusAmount(sy);
+        voucherInfo.setUpdateTime(new Date());
+        int i = voucherInfoMapper.updateByPrimaryKeySelective(voucherInfo);
+        if(i > 0){
+            VoucherLog voucherLog = new VoucherLog();
+            voucherLog.setUserId(voucherInfo.getUserId());
+            voucherLog.setVoucherId(voucherInfo.getId());
+            voucherLog.setInstanceId(instanceId);
+            voucherLog.setAmount(amount);
+            voucherLog.setTag(tag);
+            voucherLog.setUpdateTime(new Date());
+            voucherLog.setCreateTime(new Date());
+            voucherLogMapper.insertSelective(voucherLog);
+            return true;
+        }else{
+            log.info("用户[{}]-[{}]-主机[{}] ---->失败：提交扣费异常！！",id,tag,instanceId);
+            return false;
+        }
     }
 
 

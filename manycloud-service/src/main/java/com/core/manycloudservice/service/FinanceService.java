@@ -2,6 +2,7 @@ package com.core.manycloudservice.service;
 
 import com.core.manycloudcommon.utils.ResultMessage;
 import com.core.manycloudservice.so.finance.*;
+import com.core.manycloudservice.vo.VoucherVO;
 
 import java.math.BigDecimal;
 
@@ -69,5 +70,24 @@ public interface FinanceService {
      * @return
      */
     ResultMessage queryWithdrawal(QueryWithdrawalSO queryWithdrawalSO);
+
+
+    /**
+     * 查询用户代金券使用情况
+     * @param userId 用户ID
+     * @return
+     */
+    VoucherVO queryVoucher(String userId);
+
+
+    /**
+     * 使用代金券
+     * @param id 代金券ID
+     * @param amount 使用金额
+     * @param instanceId 实例ID
+     * @param tag 标签(buy:购买,renew:续费)
+     * @return
+     */
+    boolean useVoucher(Integer id,BigDecimal amount,String instanceId,String tag);
 
 }

@@ -21,6 +21,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import java.util.Arrays;
+import java.util.Date;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -204,6 +205,7 @@ public class UpdateRegionTimer {
                         log.info("准备更新镜像记录 - SQL: UPDATE t_node_image SET image_param = '{}' WHERE id = {}",
                                 cleanApiId, nodeImage.getId());
                          nodeImage.setImageParam(cleanApiId);
+                         nodeImage.setUpdateTime(new Date());
                          nodeImageMapper.updateByPrimaryKeySelective(nodeImage);
                         log.info("已更新镜像版本 {}，新镜像 ID：{}", imageVersion, cleanApiId);
                     } else {
@@ -347,6 +349,7 @@ public class UpdateRegionTimer {
                         log.info("准备更新：UPDATE t_node_image SET image_param = '{}' WHERE id = {}",
                                 cleanApiId, nodeImage.getId());
                         nodeImage.setImageParam(cleanApiId); // 存储清理后的值，避免后续差异
+                        nodeImage.setUpdateTime(new Date());
                         nodeImageMapper.updateByPrimaryKeySelective(nodeImage);
                         log.info("已更新镜像版本 {}，新镜像 ID：{}", imageVersion, cleanApiId);
                     } else {
@@ -525,6 +528,7 @@ public class UpdateRegionTimer {
                         log.info("准备更新：UPDATE t_node_image SET image_param = '{}' WHERE id = {}",
                                 cleanApiId, nodeImage.getId());
                         nodeImage.setImageParam(cleanApiId); // 存储清理后的值
+                        nodeImage.setUpdateTime(new Date());
                         nodeImageMapper.updateByPrimaryKeySelective(nodeImage); // 确保数据库更新执行
                         log.info("已更新镜像版本 {}，新镜像 ID：{}", imageVersion, cleanApiId);
                     } else {
