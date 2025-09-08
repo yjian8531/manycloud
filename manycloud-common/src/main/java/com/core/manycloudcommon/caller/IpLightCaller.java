@@ -420,23 +420,34 @@ public class IpLightCaller implements BaseCaller {
         String response = HttpRequest.postJson(url, JSONObject.fromObject(params).toString(), headers);
         JSONObject responseJson = JSONObject.fromObject(response);
 
-        // 解析code和msg
-        int code = responseJson.getInt("code");
-        if (code == 200) {
-            // code为200，返回成功
-            return RenewVO.builder()
-                    .code(CommonUtil.SUCCESS_CODE)
-                    .msg(CommonUtil.SUCCESS_MSG)
-                    .data(responseJson.get("data"))
-                    .build();
-        } else {
-            // code不为200，返回失败
-            return RenewVO.builder()
-                    .code(CommonUtil.FAIL_CODE)
-                    .msg(CommonUtil.FAIL_MSG)
-                    .data(null)
-                    .build();
+        // 3. 续费成功则提订单号、调支付
+        if (responseJson.getInt("code") == 200) {
+            String orderId = responseJson.getString("data");
+            // 调用支付接口
+            PayVO payVO = orderPay(orderId);
+
+            // 支付成功返回成功，否则返回失败
+            if (CommonUtil.SUCCESS_CODE.equals(payVO.getCode())) {
+                return RenewVO.builder()
+                        .code(CommonUtil.SUCCESS_CODE)
+                        .msg(CommonUtil.FAIL_MSG)
+                        .data(orderId)
+                        .build();
+            } else {
+                return RenewVO.builder()
+                        .code(CommonUtil.FAIL_CODE)
+                        .msg(CommonUtil.FAIL_MSG)
+                        .data(orderId)
+                        .build();
+            }
         }
+
+        // 4. 续费失败直接返回
+        return RenewVO.builder()
+                .code(CommonUtil.FAIL_CODE)
+                .msg(CommonUtil.FAIL_MSG)
+                .data(null)
+                .build();
     }
 
     /**
