@@ -61,7 +61,7 @@ public class DashboardController {
 
 
     /**
-     * 获取用户统计
+     * 获取用户统计信息
      *
      * @param
      * @return
