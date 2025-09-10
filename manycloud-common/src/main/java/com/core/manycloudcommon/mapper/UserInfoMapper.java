@@ -1,11 +1,14 @@
 package com.core.manycloudcommon.mapper;
 
+import com.core.manycloudcommon.caller.so.UserStatsSo;
 import com.core.manycloudcommon.entity.UserInfo;
 import com.core.manycloudcommon.vo.user.UserListVO;
 import com.core.manycloudcommon.vo.user.UserSelectVO;
 import org.apache.ibatis.annotations.Param;
 
+import java.util.Date;
 import java.util.List;
+import java.util.Map;
 
 public interface UserInfoMapper {
     int deleteByPrimaryKey(Integer id);
@@ -29,4 +32,21 @@ public interface UserInfoMapper {
     int updateByPrimaryKeySelective(UserInfo record);
 
     int updateByPrimaryKey(UserInfo record);
+
+
+
+
+
+
+    // 统计新增用户数
+    Integer queryCreateNum(@Param("dateStyle") String dateStyle, @Param("dateStr") String dateStr);
+
+    // 统计活跃用户数
+    Integer queryActiveNum(@Param("dateStyle") String dateStyle, @Param("dateStr") String dateStr);
+
+    //失活用户查询
+    Integer queryInactiveNum( @Param("dateStyle") String dateStyle, @Param("dateStr") String dateStr);
+
+
+
 }

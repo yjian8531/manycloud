@@ -5,7 +5,9 @@ import com.core.manycloudcommon.vo.finance.UserProductNumVO;
 import com.core.manycloudcommon.vo.instance.InstanceUserVO;
 import org.apache.ibatis.annotations.Param;
 
+import java.util.Date;
 import java.util.List;
+import java.util.Map;
 
 public interface InstanceInfoMapper {
     int deleteByPrimaryKey(Integer id);
@@ -60,4 +62,67 @@ public interface InstanceInfoMapper {
      */
     List<InstanceUserVO> selectList(@Param("account")String account,@Param("instanceId")String instanceId,@Param("powerState")String powerState,
                                           @Param("status")Integer status,@Param("sort")Integer sort);
+
+
+    /**
+     * 统计平台总实例数
+     * @return 总实例数
+     */
+    Integer countTotalInstances();
+
+    /**
+     * 统计已过期实例数
+     * @return 已过期实例数
+     */
+    Integer countExpiredInstances();
+
+    /**
+     * 统计使用中实例数
+     * @return 使用中实例数
+     */
+    Integer countInUseInstances();
+
+    /**
+     * 统计待续费实例数
+     * @return 待续费实例数
+     */
+    Integer countToBeRenewedInstances();
+
+    /**
+     * 按平台统计实例数
+     * @param label 平台标签
+     * @return 该平台的实例数
+     */
+    Integer countInstancesByPlatform(@Param("label") String label);
+
+    /**
+     * 按平台统计已过期实例数
+     * @param label 平台标签
+     * @return 该平台的已过期实例数
+     */
+    Integer countExpiredInstancesByPlatform(@Param("label") String label);
+
+    /**
+     * 按平台统计使用中实例数
+     * @param label 平台标签
+     * @return 该平台的使用中实例数
+     */
+    Integer countInUseInstancesByPlatform(@Param("label") String label);
+
+    /**
+     * 按平台统计待续费实例数
+     * @param label 平台标签
+     * @return 该平台的待续费实例数
+     */
+    Integer countToBeRenewedInstancesByPlatform(@Param("label") String label);
+
+
+    /**
+     * 按平台统计配置分布
+     * @param platform
+     * @return 该平台配置分布
+     */
+    List<Map<String, Object>> selectConfigDistribution(@Param("platform") String platform);
+
+
 }

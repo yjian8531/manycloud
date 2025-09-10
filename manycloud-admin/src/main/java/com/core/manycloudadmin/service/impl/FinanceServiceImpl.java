@@ -6,11 +6,15 @@ import com.core.manycloudadmin.so.finance.QueryListSO;
 import com.core.manycloudadmin.so.finance.QueryWithdrawalListSO;
 import com.core.manycloudadmin.so.finance.QueyrSaleDetailSO;
 import com.core.manycloudadmin.util.WeiXinCaller;
+import com.core.manycloudcommon.caller.Item.FinanceStatsItem;
+import com.core.manycloudcommon.caller.so.FinanceStatsSO;
+import com.core.manycloudcommon.caller.vo.FinanceStatsVO;
 import com.core.manycloudcommon.entity.FinanceDetail;
 import com.core.manycloudcommon.entity.FinanceWithdrawal;
 import com.core.manycloudcommon.entity.UserFinance;
 import com.core.manycloudcommon.mapper.*;
 import com.core.manycloudcommon.utils.CommonUtil;
+import com.core.manycloudcommon.utils.DateUtil;
 import com.core.manycloudcommon.utils.ResultMessage;
 import com.core.manycloudcommon.utils.StringUtils;
 import com.core.manycloudcommon.vo.finance.FinanceDetailListVO;
@@ -24,10 +28,13 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * 财务service
@@ -181,5 +188,43 @@ public class FinanceServiceImpl implements FinanceService {
 
     }
 
+    @Override
+    public ResultMessage getFinanceStats(FinanceStatsSO so) {
+        String timeUnit = so.getTimeUnit();
+        Date startTime = null;
+        Date endTime = null;
+        try {
+            // 定义日期格式，根据实际传入的日期字符串格式调整，这里假设是 yyyy-MM
+            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
+            startTime = sdf.parse(so.getStartTime());
+            endTime = sdf.parse(so.getEndTime());
+        } catch (ParseException e) {
+            // 日期解析异常时，返回错误信息
+            return new ResultMessage(ResultMessage.FAILED_CODE, "日期格式错误");
+        }
 
+        // 验证时间范围
+        if (startTime == null || endTime == null || startTime.after(endTime)) {
+            return new ResultMessage(ResultMessage.FAILED_CODE, "时间参数错误");
+        }
+
+        // 查询数据
+        List<FinanceStatsItem> items = financeDetailMapper.selectStatsByTimeUnit(timeUnit, startTime, endTime);
+
+        // 构造返回数据
+        FinanceStatsVO vo = new FinanceStatsVO();
+        vo.setDates(items.stream().map(item -> item.getDateStr()).collect(Collectors.toList()));
+        vo.setRecharge(items.stream().mapToInt(item -> item.getRecharge()).boxed().collect(Collectors.toList()));
+        vo.setConsumption(items.stream().mapToInt(item -> item.getConsumption()).boxed().collect(Collectors.toList()));
+        vo.setWithdrawal(items.stream().mapToInt(item -> item.getWithdrawal()).boxed().collect(Collectors.toList()));
+
+        // 计算总额
+        Map<String, Integer> total = new HashMap<>();
+        total.put("recharge", items.stream().mapToInt(item -> item.getRecharge()).sum());
+        total.put("consumption", items.stream().mapToInt(item -> item.getConsumption()).sum());
+        total.put("withdrawal", items.stream().mapToInt(item -> item.getWithdrawal()).sum());
+        vo.setTotal(total);
+
+        return new ResultMessage(ResultMessage.SUCCEED_CODE, ResultMessage.SUCCEED_MSG, vo);
+    }
 }

@@ -32,6 +32,10 @@ public class InterceptorConfig extends WebMvcConfigurerAdapter {
 
         registry.addInterceptor(adminInterceptor).addPathPatterns("/finance/**");
 
+        registry.addInterceptor(adminInterceptor).addPathPatterns("/dashboard/**");
+
+
+
 
     }
 }

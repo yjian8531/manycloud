@@ -4,6 +4,7 @@ import com.core.manycloudadmin.so.finance.ExecWithdrawalSO;
 import com.core.manycloudadmin.so.finance.QueryListSO;
 import com.core.manycloudadmin.so.finance.QueryWithdrawalListSO;
 import com.core.manycloudadmin.so.finance.QueyrSaleDetailSO;
+import com.core.manycloudcommon.caller.so.FinanceStatsSO;
 import com.core.manycloudcommon.utils.ResultMessage;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -46,5 +47,12 @@ public interface FinanceService {
      * @return
      */
     ResultMessage execWithdrawal(ExecWithdrawalSO execWithdrawalSO);
+
+    /**
+     * 获取财务统计数据
+     * @param so
+     * @return
+     */
+    ResultMessage getFinanceStats(FinanceStatsSO so);
 
 }
