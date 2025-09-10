@@ -3,6 +3,7 @@ package com.core.manycloudadmin.service;
 import com.core.manycloudadmin.so.user.QueryUserListSO;
 import com.core.manycloudadmin.so.user.UpdateUserFinanceSO;
 import com.core.manycloudadmin.so.user.UpdateUserRemarkSO;
+import com.core.manycloudcommon.caller.so.QueryCommissionStatisticsSO;
 import com.core.manycloudcommon.caller.so.UserStatsSo;
 import com.core.manycloudcommon.utils.ResultMessage;
 
@@ -38,6 +39,7 @@ public interface UserService {
      * @param
      * @return
      */
-    ResultMessage queryTotalUser(String timeUnit, String startTime, String endTime,Boolean includeInactive);
+    ResultMessage queryTotalUser(UserStatsSo userStatsSo);
+
 
 }

@@ -5,6 +5,8 @@ import com.core.manycloudadmin.service.InstanceService;
 
 import com.core.manycloudcommon.caller.so.FinanceStatsSO;
 
+import com.core.manycloudcommon.caller.so.PlatformSo;
+import com.core.manycloudcommon.caller.so.UserStatsSo;
 import com.core.manycloudcommon.utils.ResultMessage;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -31,8 +33,8 @@ public class DashboardController {
      * @return
      */
     @GetMapping("/platform/overview")
-    public ResultMessage getPlatformOverview(@RequestParam(required = false)  String platformLabel) {
-        return instanceService.getPlatformOverview(platformLabel);
+    public ResultMessage getPlatformOverview(@RequestBody PlatformSo  platformSo) {
+        return instanceService.getPlatformOverview(platformSo);
     }
 
     /**
@@ -49,12 +51,12 @@ public class DashboardController {
     /**
      * 获取配置分布
      *
-     * @param platform
+     * @param platformSo
      * @return
      */
     @PostMapping(value = "/config/distribution",produces = {"application/json"})
-    public ResultMessage getConfigDistribution(@RequestParam(required = false) String platform) {
-        return instanceService.getConfigDistribution(platform);
+    public ResultMessage getConfigDistribution(@RequestBody PlatformSo platformSo) {
+        return instanceService.getConfigDistribution(platformSo);
     }
 
 
@@ -65,9 +67,7 @@ public class DashboardController {
      * @return
      */
     @PostMapping(value = "/user/stats",produces = {"application/json"})
-    public ResultMessage getUserStats(@RequestParam("timeUnit")String timeUnit,
-                                      @RequestParam(value = "startTime",required = false)String startTime,
-                                      @RequestParam(value = "endTime",required = false) String endTime,Boolean includeInactive) {
-        return UserService.queryTotalUser(timeUnit, startTime, endTime,includeInactive);
+    public ResultMessage getUserStats(@RequestBody UserStatsSo userStatsSo) {
+        return UserService.queryTotalUser(userStatsSo);
     }
 }

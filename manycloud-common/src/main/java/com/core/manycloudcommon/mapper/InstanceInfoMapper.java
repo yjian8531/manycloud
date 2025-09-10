@@ -1,5 +1,7 @@
 package com.core.manycloudcommon.mapper;
 
+import com.core.manycloudcommon.caller.so.PlatformSo;
+import com.core.manycloudcommon.caller.vo.UserNumVO;
 import com.core.manycloudcommon.entity.InstanceInfo;
 import com.core.manycloudcommon.vo.finance.UserProductNumVO;
 import com.core.manycloudcommon.vo.instance.InstanceUserVO;
@@ -119,10 +121,14 @@ public interface InstanceInfoMapper {
 
     /**
      * 按平台统计配置分布
-     * @param platform
+     * @param platformSo
      * @return 该平台配置分布
      */
-    List<Map<String, Object>> selectConfigDistribution(@Param("platform") String platform);
+    List<Map<String, Object>> selectConfigDistribution(PlatformSo platformSo);
 
+
+
+    /** 查询用户推广产品数量 */
+    List<UserNumVO> selectNumByProUsers(@Param("list") List<String> userIds);
 
 }

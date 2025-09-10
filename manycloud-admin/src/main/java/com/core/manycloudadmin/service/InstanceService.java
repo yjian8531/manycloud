@@ -5,6 +5,7 @@ import com.core.manycloudadmin.so.instance.QueryDetailSO;
 import com.core.manycloudadmin.so.instance.QueryListSO;
 import com.core.manycloudadmin.so.instance.RenewSO;
 import com.core.manycloudcommon.caller.so.FinanceStatsSO;
+import com.core.manycloudcommon.caller.so.PlatformSo;
 import com.core.manycloudcommon.utils.ResultMessage;
 
 import java.math.BigDecimal;
@@ -57,15 +58,15 @@ public interface InstanceService {
      * 获取平台总览数据
      * @return 平台总览数据
      */
-    ResultMessage getPlatformOverview(String platformLabel);
+    ResultMessage getPlatformOverview(PlatformSo  platformSo);
 
 
     /**
      * 获取配置分布
-     * @param platform
+     * @param platformSo
      * @return
      */
-    ResultMessage getConfigDistribution(String platform);
+    ResultMessage getConfigDistribution(PlatformSo  platformSo);
 
 
 

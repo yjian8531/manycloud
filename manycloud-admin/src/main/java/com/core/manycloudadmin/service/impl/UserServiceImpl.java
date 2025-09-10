@@ -6,13 +6,13 @@ import com.core.manycloudadmin.so.user.UpdateUserFinanceSO;
 import com.core.manycloudadmin.so.user.UpdateUserRemarkSO;
 import com.core.manycloudadmin.so.util.DateUtil;
 import com.core.manycloudadmin.util.WeiXinCaller;
+import com.core.manycloudcommon.caller.so.QueryCommissionStatisticsSO;
+import com.core.manycloudcommon.caller.so.UserStatsSo;
+import com.core.manycloudcommon.caller.vo.QueryCommissionStatisticsVO;
+import com.core.manycloudcommon.caller.vo.UserNumVO;
 import com.core.manycloudcommon.entity.FinanceDetail;
-import com.core.manycloudcommon.entity.Summary;
 import com.core.manycloudcommon.entity.UserInfo;
-import com.core.manycloudcommon.mapper.FinanceDetailMapper;
-import com.core.manycloudcommon.mapper.InstanceInfoMapper;
-import com.core.manycloudcommon.mapper.UserFinanceMapper;
-import com.core.manycloudcommon.mapper.UserInfoMapper;
+import com.core.manycloudcommon.mapper.*;
 import com.core.manycloudcommon.utils.CommonUtil;
 import com.core.manycloudcommon.utils.ResultMessage;
 import com.core.manycloudcommon.vo.user.UserListVO;
@@ -21,8 +21,8 @@ import com.github.pagehelper.PageHelper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
 import java.text.ParseException;
-import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -43,6 +43,13 @@ public class UserServiceImpl implements UserService {
 
     @Autowired
     private WeiXinCaller weiXinCaller;
+
+    @Autowired
+    private UserProMapper userProMapper;
+
+
+    @Autowired
+    private CommissionDetailMapper commissionDetailMapper;
 
     /**
      * 查询用户列表
@@ -128,42 +135,43 @@ public class UserServiceImpl implements UserService {
     }
 
     /**
-     * 用户统计曲线图数据（仅新增、活跃、失活）
-     *
-     * @param timeUnit 时间节点
-     * @param startTime 开始时间
-     * @param endTime   结束时间
+     * 用户统计曲线图数据（新增、活跃、失活）
      * @return 统计结果
      */
-    public ResultMessage queryTotalUser(String timeUnit, String startTime, String endTime, Boolean includeInactive) {
+    public ResultMessage queryTotalUser(UserStatsSo userStatsSo) {
         String formatStr = null;
         String dbFormatStr = null;
-        if ("year".equals(timeUnit)) {
+
+        // 从实体类获取时间粒度参数
+        if ("year".equals(userStatsSo.getTimeUnit())) {
             dbFormatStr = "%Y";
             formatStr = "yyyy";
-        } else if ("month".equals(timeUnit)) {
+        } else if ("month".equals(userStatsSo.getTimeUnit())) {
             dbFormatStr = "%Y-%m";
             formatStr = "yyyy-MM";
-        } else if ("day".equals(timeUnit)) {
+        } else if ("day".equals(userStatsSo.getTimeUnit())) {
             dbFormatStr = "%Y-%m-%d";
             formatStr = "yyyy-MM-dd";
         } else {
             return new ResultMessage("400", "时间粒度必须是 year/month/day", null);
         }
 
-        // 处理结束时间
+        // 处理结束时间（直接使用实体类的getter方法）
+        String endTime = userStatsSo.getEndTime();
         if (endTime == null || endTime.trim().isEmpty()) {
             endTime = DateUtil.format(new Date(), formatStr);
         }
 
         // 处理开始时间
+        String startTime = userStatsSo.getStartTime();
         if (startTime == null || startTime.trim().isEmpty()) {
-            int offset = "day".equals(timeUnit) ? 30 : ("month".equals(timeUnit) ? 12 : 1);
+            int offset = "day".equals(userStatsSo.getTimeUnit()) ? 30 :
+                    ("month".equals(userStatsSo.getTimeUnit()) ? 12 : 1);
             try {
                 Date endDate = DateUtil.parse(endTime, formatStr);
-                Date startDate = "day".equals(timeUnit) ?
+                Date startDate = "day".equals(userStatsSo.getTimeUnit()) ?
                         DateUtil.offsetDay(endDate, -offset) :
-                        "month".equals(timeUnit) ?
+                        "month".equals(userStatsSo.getTimeUnit()) ?
                                 DateUtil.offsetMonth(endDate, -offset) :
                                 DateUtil.offsetYear(endDate, -offset);
                 startTime = DateUtil.format(startDate, formatStr);
@@ -178,7 +186,7 @@ public class UserServiceImpl implements UserService {
             dateList = DateUtil.rangeToList(
                     DateUtil.parse(startTime, formatStr),
                     DateUtil.parse(endTime, formatStr),
-                    timeUnit,
+                    userStatsSo.getTimeUnit(),
                     formatStr
             );
         } catch (ParseException e) {
@@ -188,7 +196,7 @@ public class UserServiceImpl implements UserService {
             return new ResultMessage("400", "开始时间不能晚于结束时间", null);
         }
 
-        //结果数据结构
+        // 结果数据结构
         List<Integer> newUsersList = new ArrayList<>();
         List<Integer> activeUsersList = new ArrayList<>();
         List<Integer> inactiveUsersList = new ArrayList<>();
@@ -196,7 +204,7 @@ public class UserServiceImpl implements UserService {
         // 汇总统计
         int totalNewUsers = 0;
         int totalActiveUsers = 0;
-        int totalInactiveUsers = 0; // 直接累计每日失活数，不做去重
+        int totalInactiveUsers = 0;
 
         for (String dateStr : dateList) {
             // 查询新增用户
@@ -216,9 +224,10 @@ public class UserServiceImpl implements UserService {
             inactiveNum = inactiveNum == null ? 0 : inactiveNum;
 
             // 处理是否显示失活数
-            boolean showInactive = includeInactive == null ? true : includeInactive;
+            boolean showInactive = userStatsSo.getIncludeInactive() == null ?
+                    true : userStatsSo.getIncludeInactive();
             inactiveUsersList.add(showInactive ? inactiveNum : 0);
-            totalInactiveUsers += showInactive ? inactiveNum : 0; // 累计每日失活数
+            totalInactiveUsers += showInactive ? inactiveNum : 0;
         }
 
         // 计算活跃用户平均值（四舍五入）
@@ -240,6 +249,7 @@ public class UserServiceImpl implements UserService {
 
         return new ResultMessage(ResultMessage.SUCCEED_CODE, ResultMessage.SUCCEED_MSG, data);
     }
+
 
 
 

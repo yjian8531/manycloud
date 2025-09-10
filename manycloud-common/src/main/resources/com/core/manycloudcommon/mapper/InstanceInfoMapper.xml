@@ -598,17 +598,18 @@
 
   <select id="selectConfigDistribution" resultType="java.util.Map" parameterType="java.lang.String">
     SELECT
-    CONCAT(cpu, '核', ram, 'G') AS name,  -- 拼接规格名称
-    COUNT(*) AS value                     -- 统计数量
+    CONCAT(cpu, '核', ram, 'G') AS name,
+    COUNT(*) AS value
     FROM t_instance_info
-    WHERE status IN (1, 3, 4, 5)  -- 只统计有效状态主机
-    <!-- 动态条件：如果platform不为空，则添加平台筛选 -->
-    <if test="platform != null and platform != ''">
-      AND label = #{platform}
+    WHERE status IN (1, 3, 4, 5)
+    <if test="platformLabel != null and platformLabel != ''">
+      AND label = #{platformLabel}
     </if>
-    GROUP BY cpu, ram  -- 按配置分组
+    GROUP BY cpu, ram
     ORDER BY value DESC
   </select>
+
+
 
 
 </mapper>
