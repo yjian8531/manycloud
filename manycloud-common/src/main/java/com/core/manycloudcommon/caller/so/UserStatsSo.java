@@ -13,6 +13,6 @@ public class UserStatsSo {
     private String startTime;
     /** 结束日期：yyyy-MM-dd（按年查时传 yyyy-12-31 即可） */
     private String endTime;
-    /** 是否包含失活用户：默认true */
+    /** 是否包含失活用户：默认true  */
     private Boolean includeInactive = true;
 }

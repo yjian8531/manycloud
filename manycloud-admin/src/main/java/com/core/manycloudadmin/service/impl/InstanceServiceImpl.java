@@ -2,13 +2,10 @@ package com.core.manycloudadmin.service.impl;
 
 import com.core.manycloudadmin.service.InstanceService;
 import com.core.manycloudadmin.so.instance.*;
+import com.core.manycloudadmin.so.instance.RenewSO;
 import com.core.manycloudcommon.caller.BaseCaller;
 import com.core.manycloudcommon.caller.Item.ConfigItemVO;
-import com.core.manycloudcommon.caller.Item.FinanceStatsItem;
-import com.core.manycloudcommon.caller.so.FinanceStatsSO;
-import com.core.manycloudcommon.caller.so.RebootSO;
-import com.core.manycloudcommon.caller.so.StartSO;
-import com.core.manycloudcommon.caller.so.StopSO;
+import com.core.manycloudcommon.caller.so.*;
 import com.core.manycloudcommon.caller.vo.*;
 import com.core.manycloudcommon.entity.*;
 import com.core.manycloudcommon.entity.TimerTask;
@@ -761,7 +758,7 @@ public class InstanceServiceImpl implements InstanceService {
         return targetLevel;
     }
     @Override
-    public ResultMessage getPlatformOverview(String platformLabel) {
+    public ResultMessage getPlatformOverview(PlatformSo platformSo) {
         // 创建返回数据对象
         Map<String, Object> data = new LinkedHashMap<>();
        // 1. 获取统计数据（根据平台筛选动态调整）
@@ -770,7 +767,7 @@ public class InstanceServiceImpl implements InstanceService {
         Integer inUse;
         Integer toBeRenewed;
 
-        if (platformLabel == null || "全部".equals(platformLabel)) {
+        if (platformSo.getPlatformLabel() == null || "全部".equals(platformSo.getPlatformLabel())) {
             // 若未指定平台或选择"全部"，统计所有平台数据
             total = instanceInfoMapper.countTotalInstances();
             expired = instanceInfoMapper.countExpiredInstances();
@@ -778,10 +775,10 @@ public class InstanceServiceImpl implements InstanceService {
             toBeRenewed = instanceInfoMapper.countToBeRenewedInstances();
         } else {
             // 若指定了平台，只统计该平台的数据
-            total = instanceInfoMapper.countInstancesByPlatform(platformLabel);
-            expired = instanceInfoMapper.countExpiredInstancesByPlatform(platformLabel);
-            inUse = instanceInfoMapper.countInUseInstancesByPlatform(platformLabel);
-            toBeRenewed = instanceInfoMapper.countToBeRenewedInstancesByPlatform(platformLabel);
+            total = instanceInfoMapper.countInstancesByPlatform(platformSo.getPlatformLabel());
+            expired = instanceInfoMapper.countExpiredInstancesByPlatform(platformSo.getPlatformLabel());
+            inUse = instanceInfoMapper.countInUseInstancesByPlatform(platformSo.getPlatformLabel());
+            toBeRenewed = instanceInfoMapper.countToBeRenewedInstancesByPlatform(platformSo.getPlatformLabel());
         }
 
         data.put("total", total);
@@ -791,11 +788,11 @@ public class InstanceServiceImpl implements InstanceService {
 
        // 2. 获取平台列表数据（若筛选单个平台则只返回该平台，否则返回所有平台）
         List<PlatformInfo> platforms;
-        if (platformLabel == null || "全部".equals(platformLabel)) {
+        if (platformSo.getPlatformLabel() == null || "全部".equals(platformSo.getPlatformLabel())) {
             platforms = platformInfoMapper.selectAll(); // 所有平台
         } else {
             // 只查询指定平台（返回单个PlatformInfo对象）
-            PlatformInfo platform = platformInfoMapper.selectByLabel(platformLabel);
+            PlatformInfo platform = platformInfoMapper.selectByLabel(platformSo.getPlatformLabel());
             platforms = new ArrayList<>();
             if (platform != null) {
                 platforms.add(platform);
@@ -820,16 +817,16 @@ public class InstanceServiceImpl implements InstanceService {
 
     /**
      * 获取平台统计信息
-     * @param platform
+     * @param platformSo
      * @return
      */
     @Override
-    public ResultMessage getConfigDistribution(String platform) {
-        List<Map<String, Object>> configList = instanceInfoMapper.selectConfigDistribution(platform);
+    public ResultMessage getConfigDistribution(PlatformSo platformSo) {
+        List<Map<String, Object>> configList = instanceInfoMapper.selectConfigDistribution(platformSo);
 
         // 封装响应数据
         ConfigDistributionVO vo = new ConfigDistributionVO();
-        vo.setPlatform(platform == null || platform.isEmpty() ? "全部" : platform);
+        vo.setPlatform(platformSo.getPlatformLabel() == null || platformSo.getPlatformLabel().isEmpty() ? "全部" : platformSo.getPlatformLabel());
 
         List<ConfigItemVO> items = new ArrayList<>();
         for (Map<String, Object> item : configList) {

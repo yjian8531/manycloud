@@ -6,10 +6,9 @@ import com.core.manycloudadmin.so.user.UpdateUserFinanceSO;
 import com.core.manycloudadmin.so.user.UpdateUserRemarkSO;
 import com.core.manycloudadmin.so.util.DateUtil;
 import com.core.manycloudadmin.util.WeiXinCaller;
-import com.core.manycloudcommon.caller.so.QueryCommissionStatisticsSO;
+
 import com.core.manycloudcommon.caller.so.UserStatsSo;
-import com.core.manycloudcommon.caller.vo.QueryCommissionStatisticsVO;
-import com.core.manycloudcommon.caller.vo.UserNumVO;
+
 import com.core.manycloudcommon.entity.FinanceDetail;
 import com.core.manycloudcommon.entity.UserInfo;
 import com.core.manycloudcommon.mapper.*;
@@ -21,10 +20,10 @@ import com.github.pagehelper.PageHelper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import java.math.BigDecimal;
+
 import java.text.ParseException;
 import java.util.*;
-import java.util.stream.Collectors;
+
 
 @Service
 public class UserServiceImpl implements UserService {
@@ -249,8 +248,5 @@ public class UserServiceImpl implements UserService {
 
         return new ResultMessage(ResultMessage.SUCCEED_CODE, ResultMessage.SUCCEED_MSG, data);
     }
-
-
-
 
 }

@@ -35,11 +35,10 @@ public interface UserService {
 
 
     /**
-     * 获取用户统计
+     * 获取用户统计信息
      * @param
      * @return
      */
     ResultMessage queryTotalUser(UserStatsSo userStatsSo);
-
 
 }

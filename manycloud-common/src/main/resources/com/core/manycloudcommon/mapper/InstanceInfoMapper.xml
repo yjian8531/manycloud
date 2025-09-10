@@ -609,7 +609,4 @@
     ORDER BY value DESC
   </select>
 
-
-
-
 </mapper>

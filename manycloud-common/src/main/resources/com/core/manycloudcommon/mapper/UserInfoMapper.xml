@@ -336,7 +336,7 @@
                       AND tii.status IN (3, 4)  -- 活跃状态
                       AND DATE_FORMAT(tii.create_time, #{dateStyle}) = #{dateStr}
                 )
-          --排除从未有过主机的用户
+          -- 排除从未有过主机的用户
           AND EXISTS (
                 SELECT 1
                 FROM t_instance_info tii2
@@ -344,6 +344,5 @@
                   AND DATE_FORMAT(tii2.create_time, #{dateStyle}) &lt;= #{dateStr}
             )
     </select>
-
 
 </mapper>

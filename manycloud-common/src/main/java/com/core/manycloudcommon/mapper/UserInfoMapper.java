@@ -1,14 +1,14 @@
 package com.core.manycloudcommon.mapper;
 
-import com.core.manycloudcommon.caller.so.UserStatsSo;
+
 import com.core.manycloudcommon.entity.UserInfo;
 import com.core.manycloudcommon.vo.user.UserListVO;
 import com.core.manycloudcommon.vo.user.UserSelectVO;
 import org.apache.ibatis.annotations.Param;
 
-import java.util.Date;
+
 import java.util.List;
-import java.util.Map;
+
 
 public interface UserInfoMapper {
     int deleteByPrimaryKey(Integer id);
@@ -46,6 +46,11 @@ public interface UserInfoMapper {
 
     //失活用户查询
     Integer queryInactiveNum( @Param("dateStyle") String dateStyle, @Param("dateStr") String dateStr);
+
+
+
+
+
 
 
 
