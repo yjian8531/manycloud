@@ -4,9 +4,7 @@ import com.core.manycloudadmin.so.instance.ExecPowerSO;
 import com.core.manycloudadmin.so.instance.QueryDetailSO;
 import com.core.manycloudadmin.so.instance.QueryListSO;
 import com.core.manycloudadmin.so.instance.RenewSO;
-import com.core.manycloudcommon.caller.so.FinanceStatsSO;
 import com.core.manycloudcommon.caller.so.PlatformSo;
-import com.core.manycloudcommon.caller.so.UserStatsSo;
 import com.core.manycloudcommon.utils.ResultMessage;
 
 import java.math.BigDecimal;
