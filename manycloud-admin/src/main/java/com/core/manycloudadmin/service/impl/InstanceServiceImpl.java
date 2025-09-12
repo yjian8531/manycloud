@@ -767,7 +767,7 @@ public class InstanceServiceImpl implements InstanceService {
         Integer inUse;
         Integer toBeRenewed;
 
-        if (platformSo.getPlatformLabel() == null || "全部".equals(platformSo.getPlatformLabel())) {
+        if (platformSo.getPlatformLabel().equals("") || "全部".equals(platformSo.getPlatformLabel())) {
             // 若未指定平台或选择"全部"，统计所有平台数据
             total = instanceInfoMapper.countTotalInstances();
             expired = instanceInfoMapper.countExpiredInstances();
@@ -788,7 +788,7 @@ public class InstanceServiceImpl implements InstanceService {
 
        // 2. 获取平台列表数据（若筛选单个平台则只返回该平台，否则返回所有平台）
         List<PlatformInfo> platforms;
-        if (platformSo.getPlatformLabel() == null || "全部".equals(platformSo.getPlatformLabel())) {
+        if (platformSo.getPlatformLabel().equals("")|| "全部".equals(platformSo.getPlatformLabel())) {
             platforms = platformInfoMapper.selectAll(); // 所有平台
         } else {
             // 只查询指定平台（返回单个PlatformInfo对象）
