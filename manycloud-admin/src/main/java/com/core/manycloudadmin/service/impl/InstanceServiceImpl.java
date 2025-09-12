@@ -759,23 +759,23 @@ public class InstanceServiceImpl implements InstanceService {
     }
     @Override
     public ResultMessage getPlatformOverview(PlatformSo platformSo) {
-        // 创建返回数据对象
         Map<String, Object> data = new LinkedHashMap<>();
-       // 1. 获取统计数据（根据平台筛选动态调整）
-        Integer total;
-        Integer expired;
-        Integer inUse;
-        Integer toBeRenewed;
+        Integer total, expired, inUse, toBeRenewed;
 
-         // 判断平台查询条件是否为空对象
-        if (platformSo == null) {
-            // 若传入空对象，统计所有平台数据
+        // 判断是否需要查询全部（空对象/空标签）
+        boolean queryAll = platformSo == null
+                || (platformSo.getPlatformLabel() == null
+                || platformSo.getPlatformLabel().trim().isEmpty());
+
+        // 1. 获取统计数据
+        if (queryAll) {
+            // 查询全部平台
             total = instanceInfoMapper.countTotalInstances();
             expired = instanceInfoMapper.countExpiredInstances();
             inUse = instanceInfoMapper.countInUseInstances();
             toBeRenewed = instanceInfoMapper.countToBeRenewedInstances();
         } else {
-            // 若传入非空对象，按平台名称查询
+            // 按平台名称查询
             String platformName = platformSo.getPlatformLabel();
             total = instanceInfoMapper.countInstancesByPlatform(platformName);
             expired = instanceInfoMapper.countExpiredInstancesByPlatform(platformName);
@@ -788,12 +788,11 @@ public class InstanceServiceImpl implements InstanceService {
         data.put("inUse", inUse);
         data.put("toBeRenewed", toBeRenewed);
 
-        // 2. 获取平台列表数据
+        // 2. 获取平台列表数据（同样应用queryAll判断）
         List<PlatformInfo> platforms;
-        if (platformSo == null) {
+        if (queryAll) {
             platforms = platformInfoMapper.selectAll();
         } else {
-            // 按平台名称查询指定平台
             String platformName = platformSo.getPlatformLabel();
             PlatformInfo platform = platformInfoMapper.selectByLabel(platformName);
             platforms = new ArrayList<>();
@@ -802,6 +801,7 @@ public class InstanceServiceImpl implements InstanceService {
             }
         }
 
+        // 3. 封装平台统计详情
         List<Map<String, Object>> platformStats = new ArrayList<>();
         for (PlatformInfo platform : platforms) {
             Map<String, Object> platformStat = new HashMap<>();
