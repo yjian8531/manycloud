@@ -609,4 +609,25 @@
     ORDER BY value DESC
   </select>
 
+  <select id="selectNumByProUsers" resultType="com.core.manycloudcommon.caller.vo.UserNumVO"
+          parameterType="java.util.List">
+    select
+    IFNULL(count(p.id), 0) as num,
+    up.pro_user_id as userId
+    from
+    t_instance_info as p
+    left join
+    t_order_info as o on o.order_no = p.order_no
+    left join
+    t_user_pro as up on up.user_id = o.user_id
+    where
+    (p.status = 3 or p.status = 4)
+    and up.pro_user_id in
+    <foreach item="item" collection="list" separator="," open="(" close=")">
+      #{item,jdbcType=VARCHAR}
+    </foreach>
+    group by up.pro_user_id
+  </select>
+
+
 </mapper>

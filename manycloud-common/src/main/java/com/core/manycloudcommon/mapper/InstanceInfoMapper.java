@@ -131,4 +131,8 @@ public interface InstanceInfoMapper {
     /** 查询用户推广产品数量 */
     List<UserNumVO> selectNumByProUsers(@Param("list") List<String> userIds);
 
+
+//    /** 查询用户产品数量 */
+//    List<UserNumVO> selectListByUserSNum(@Param("list") List<String> userIds);
+
 }
