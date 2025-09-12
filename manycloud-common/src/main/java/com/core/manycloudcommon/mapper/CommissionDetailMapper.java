@@ -1,8 +1,8 @@
 package com.core.manycloudcommon.mapper;
 
+import com.core.manycloudcommon.caller.vo.QueryCommissionStatisticsVO;
 import com.core.manycloudcommon.entity.CommissionDetail;
 import com.core.manycloudcommon.vo.finance.QueryCommissionDetailListVO;
-import com.core.manycloudcommon.vo.finance.QueryCommissionStatisticsVO;
 import org.apache.ibatis.annotations.Param;
 
 import java.util.List;
@@ -17,11 +17,20 @@ public interface CommissionDetailMapper {
 
     CommissionDetail selectByPrimaryKey(Integer id);
 
-    QueryCommissionStatisticsVO selectStatisticsByUser(@Param("userId") String userId);
+    com.core.manycloudcommon.vo.finance.QueryCommissionStatisticsVO selectStatisticsByUser(@Param("userId") String userId);
 
     int updateByPrimaryKeySelective(CommissionDetail record);
 
     int updateByPrimaryKey(CommissionDetail record);
 
     List<QueryCommissionDetailListVO> selectList(Map<String,Object> param);
+
+
+
+    /** 查询用户消费、返佣总额 */
+    List<QueryCommissionStatisticsVO> selectStatisticsByUserIds(@Param("userIds") List<String> userIds);
+
+    List<com.core.manycloudcommon.vo.finance.QueryCommissionStatisticsVO> selectStatisticsByPromoterId(@Param("promoterId") String promoterId);
+
+    List<QueryCommissionDetailListVO> selectListUser(Map<String,Object> param);
 }

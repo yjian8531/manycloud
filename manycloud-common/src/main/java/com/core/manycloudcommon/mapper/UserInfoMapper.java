@@ -1,6 +1,7 @@
 package com.core.manycloudcommon.mapper;
 
 
+import com.core.manycloudcommon.caller.so.QueryUserLevelListSO;
 import com.core.manycloudcommon.entity.UserInfo;
 import com.core.manycloudcommon.vo.user.UserListVO;
 import com.core.manycloudcommon.vo.user.UserSelectVO;
@@ -46,6 +47,19 @@ public interface UserInfoMapper {
 
     //失活用户查询
     Integer queryInactiveNum( @Param("dateStyle") String dateStyle, @Param("dateStr") String dateStr);
+
+//
+//    // 查询用户列表（带等级信息）
+//    List<UserListVO> selectListWithLevel(@Param("account") String account,
+//                                         @Param("nick") String nick,
+//                                         @Param("startTime") String startTime,
+//                                         @Param("endTime") String endTime,
+//                                         @Param("status") Integer status,
+//                                         @Param("levelId") Integer levelId);
+
+
+    // 查询用户列表（带等级信息）
+    List<UserListVO> selectListWithLevel(QueryUserLevelListSO queryUserLevelListSO);
 
 
 

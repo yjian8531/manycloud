@@ -1,0 +1,220 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="com.core.manycloudcommon.mapper.OfflineFinanceTOMapper">
+  <resultMap id="BaseResultMap" type="com.core.manycloudcommon.entity.OfflineFinance">
+    <id column="id" property="id" jdbcType="INTEGER"/>
+    <result column="amount_num" property="amountNum" jdbcType="DECIMAL"/>
+    <result column="way" property="way" jdbcType="INTEGER"/>
+    <result column="direction" property="direction" jdbcType="INTEGER"/>
+    <result column="tag" property="tag" jdbcType="INTEGER"/>
+    <result column="association" property="association" jdbcType="VARCHAR"/>
+    <result column="remark" property="remark" jdbcType="VARCHAR"/>
+    <result column="occur_time" property="occurTime" jdbcType="TIMESTAMP"/>
+    <result column="create_time" property="createTime" jdbcType="TIMESTAMP"/>
+  </resultMap>
+  <sql id="Base_Column_List" >
+    id, amount_num, way, direction, tag, association, remark,occur_time, create_time
+  </sql>
+  <select id="selectByPrimaryKey" resultMap="BaseResultMap" parameterType="java.lang.Integer" >
+    select
+    <include refid="Base_Column_List" />
+    from t_offline_finance
+    where id = #{id,jdbcType=INTEGER}
+  </select>
+  <delete id="deleteByPrimaryKey" parameterType="java.lang.Integer" >
+    delete from t_offline_finance
+    where id = #{id,jdbcType=INTEGER}
+  </delete>
+  <insert id="insert" parameterType="com.core.manycloudcommon.entity.OfflineFinance" >
+    <selectKey resultType="java.lang.Integer" keyProperty="id" order="AFTER" >
+      SELECT LAST_INSERT_ID()
+    </selectKey>
+    insert into t_offline_finance (amount_num, way, direction,
+    tag, association, remark, occur_time,
+    create_time)
+    values (#{amountNum,jdbcType=DECIMAL}, #{way,jdbcType=INTEGER}, #{direction,jdbcType=INTEGER},
+    #{tag,jdbcType=INTEGER}, #{association,jdbcType=VARCHAR}, #{remark,jdbcType=VARCHAR}, #{occurTime,jdbcType=TIMESTAMP},
+    #{createTime,jdbcType=TIMESTAMP})
+  </insert>
+  <insert id="insertSelective" parameterType="com.core.manycloudcommon.entity.OfflineFinance" >
+    <selectKey resultType="java.lang.Integer" keyProperty="id" order="AFTER" >
+      SELECT LAST_INSERT_ID()
+    </selectKey>
+    insert into t_offline_finance
+    <trim prefix="(" suffix=")" suffixOverrides="," >
+      <if test="amountNum != null" >
+        amount_num,
+      </if>
+      <if test="way != null" >
+        way,
+      </if>
+      <if test="direction != null" >
+        direction,
+      </if>
+      <if test="tag != null" >
+        tag,
+      </if>
+      <if test="association != null" >
+        association,
+      </if>
+      <if test="remark != null" >
+        remark,
+      </if>
+      <if test="occurTime != null" >
+        occur_time,
+      </if>
+      <if test="createTime != null" >
+        create_time,
+      </if>
+    </trim>
+    <trim prefix="values (" suffix=")" suffixOverrides="," >
+      <if test="amountNum != null" >
+        #{amountNum,jdbcType=DECIMAL},
+      </if>
+      <if test="way != null" >
+        #{way,jdbcType=INTEGER},
+      </if>
+      <if test="direction != null" >
+        #{direction,jdbcType=INTEGER},
+      </if>
+      <if test="tag != null" >
+        #{tag,jdbcType=INTEGER},
+      </if>
+      <if test="association != null" >
+        #{association,jdbcType=VARCHAR},
+      </if>
+      <if test="remark != null" >
+        #{remark,jdbcType=VARCHAR},
+      </if>
+      <if test="occurTime != null" >
+        #{occurTime,jdbcType=TIMESTAMP},
+      </if>
+      <if test="createTime != null" >
+        #{createTime,jdbcType=TIMESTAMP},
+      </if>
+    </trim>
+  </insert>
+  <update id="updateByPrimaryKeySelective" parameterType="com.core.manycloudcommon.entity.OfflineFinance" >
+    update t_offline_finance
+    <set >
+      <if test="amountNum != null" >
+        amount_num = #{amountNum,jdbcType=DECIMAL},
+      </if>
+      <if test="way != null" >
+        way = #{way,jdbcType=INTEGER},
+      </if>
+      <if test="direction != null" >
+        direction = #{direction,jdbcType=INTEGER},
+      </if>
+      <if test="tag != null" >
+        tag = #{tag,jdbcType=INTEGER},
+      </if>
+      <if test="association != null" >
+        association = #{association,jdbcType=VARCHAR},
+      </if>
+      <if test="remark != null" >
+        remark = #{remark,jdbcType=VARCHAR},
+      </if>
+      <if test="occurTime != null" >
+        occur_time = #{occurTime,jdbcType=TIMESTAMP},
+      </if>
+      <if test="createTime != null" >
+        create_time = #{createTime,jdbcType=TIMESTAMP},
+      </if>
+    </set>
+    where id = #{id,jdbcType=INTEGER}
+  </update>
+  <update id="updateByPrimaryKey" parameterType="com.core.manycloudcommon.entity.OfflineFinance" >
+    update t_offline_finance
+    set amount_num = #{amountNum,jdbcType=DECIMAL},
+        way = #{way,jdbcType=INTEGER},
+        direction = #{direction,jdbcType=INTEGER},
+        tag = #{tag,jdbcType=INTEGER},
+        association = #{association,jdbcType=VARCHAR},
+        remark = #{remark,jdbcType=VARCHAR},
+        occur_time = #{occurTime,jdbcType=TIMESTAMP},
+        create_time = #{createTime,jdbcType=TIMESTAMP}
+    where id = #{id,jdbcType=INTEGER}
+  </update>
+
+  <select id="selectList" parameterType="java.util.Map"   resultMap="BaseResultMap" resultType="com.core.manycloudcommon.entity.OfflineFinance">
+    select
+    <include refid="Base_Column_List" />
+    from t_offline_finance
+    where
+    1 = 1
+    <if test="way != null" >
+      and way = #{way,jdbcType=INTEGER}
+    </if>
+    <if test="direction != null" >
+      and direction = #{direction,jdbcType=INTEGER}
+    </if>
+    <if test="tag != null" >
+      and tag = #{tag,jdbcType=INTEGER}
+    </if>
+    <if test="association != null" >
+      and association like '%${association}%'
+    </if>
+    <if test="remark != null" >
+      and remark like '%${remark}%'
+    </if>
+    <if test="startTime != null" >
+      and create_time >= #{startTime,jdbcType=VARCHAR}
+    </if>
+    <if test="endTime != null" >
+      and #{endTime,jdbcType=VARCHAR} > create_time
+    </if>
+    order by id desc
+  </select>
+
+  <select id="selectStatisticsByIncome" resultType="java.math.BigDecimal" parameterType="java.lang.String">
+    select
+    IFNULL(sum(amount_num),0.0) as numerical
+    from
+    t_offline_finance
+    where
+    direction = 0
+    <if test="startDay != null" >
+      and occur_time >= #{startDay,jdbcType=VARCHAR}
+    </if>
+    <if test="endDay != null" >
+      and #{endDay,jdbcType=VARCHAR} > occur_time
+    </if>
+  </select>
+
+
+  <select id="selectStatisticsByExpenditure" resultType="com.core.manycloudcommon.caller.vo.StatisticsExpenditureVO" parameterType="java.lang.String">
+    select
+    IFNULL(sum(CASE WHEN tag = 0 THEN amount_num END),0.0) as offlineCommission,
+    IFNULL(sum(CASE WHEN tag = 1 THEN amount_num END),0.0) as offlineWithdrawal,
+    IFNULL(sum(CASE WHEN tag = 2 THEN amount_num END),0.0) as procure
+    from
+    t_offline_finance
+    where
+    direction = 1
+    <if test="startDay != null" >
+      and occur_time >= #{startDay,jdbcType=VARCHAR}
+    </if>
+    <if test="endDay != null" >
+      and #{endDay,jdbcType=VARCHAR} > occur_time
+    </if>
+  </select>
+
+  <select id="selectRefundByAccount" resultType="java.math.BigDecimal">
+    select
+    IFNULL(sum(amount_num),0.0)as moneyNum
+    from
+    t_offline_finance
+    where
+    direction = 1
+    and
+    tag = 1
+    and
+    DATE_FORMAT(create_time, '%Y-%m') = #{monthStr,jdbcType=VARCHAR}
+    and
+    <foreach item="item" collection="list" separator="or" open="(" close=")">
+      remark like '%${item}%'
+    </foreach>
+
+  </select>
+</mapper>

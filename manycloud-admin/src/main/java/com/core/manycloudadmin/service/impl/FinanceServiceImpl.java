@@ -5,13 +5,14 @@ import com.core.manycloudadmin.so.finance.ExecWithdrawalSO;
 import com.core.manycloudadmin.so.finance.QueryListSO;
 import com.core.manycloudadmin.so.finance.QueryWithdrawalListSO;
 import com.core.manycloudadmin.so.finance.QueyrSaleDetailSO;
+import com.core.manycloudadmin.util.ExcelUtil;
 import com.core.manycloudadmin.util.WeiXinCaller;
 import com.core.manycloudcommon.caller.Item.FinanceStatsItem;
-import com.core.manycloudcommon.caller.so.FinanceStatsSO;
+import com.core.manycloudcommon.caller.so.*;
 import com.core.manycloudcommon.caller.vo.FinanceStatsVO;
 import com.core.manycloudcommon.entity.FinanceDetail;
 import com.core.manycloudcommon.entity.FinanceWithdrawal;
-import com.core.manycloudcommon.entity.UserFinance;
+import com.core.manycloudcommon.entity.OfflineFinance;
 import com.core.manycloudcommon.mapper.*;
 import com.core.manycloudcommon.utils.CommonUtil;
 import com.core.manycloudcommon.utils.DateUtil;
@@ -28,12 +29,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import javax.servlet.http.HttpServletResponse;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Collectors;
 
 /**
@@ -61,6 +60,10 @@ public class FinanceServiceImpl implements FinanceService {
 
     @Autowired
     private WeiXinCaller weiXinCaller;
+
+
+    @Autowired
+    private OfflineFinanceTOMapper offlineFinanceTOMapper;
 
 
     /**
@@ -227,4 +230,168 @@ public class FinanceServiceImpl implements FinanceService {
 
         return new ResultMessage(ResultMessage.SUCCEED_CODE, ResultMessage.SUCCEED_MSG, vo);
     }
+    /**
+     * 删除线下账单
+     * @param delOfflineSO
+     * @return
+     */
+    @Override
+    public ResultMessage delOffline(DelOfflineSO delOfflineSO) {
+        int i = offlineFinanceTOMapper.deleteByPrimaryKey(delOfflineSO.getId());
+        if(i > 0){
+            return new ResultMessage(ResultMessage.SUCCEED_CODE,"删除成功");
+        }else{
+            return new ResultMessage(ResultMessage.FAILED_CODE,"删除失败");
+        }
+    }
+
+    /**
+     * 添加线下财务账单
+     * @param addOfflineSO
+     * @return
+     */
+    public ResultMessage addOffline(AddOfflineSO addOfflineSO){
+        OfflineFinance offlineFinance = new OfflineFinance();
+        offlineFinance.setAmountNum(addOfflineSO.getAmountNum());
+        offlineFinance.setAssociation(addOfflineSO.getAssociation());
+        offlineFinance.setDirection(addOfflineSO.getDirection());
+        offlineFinance.setRemark(addOfflineSO.getRemark());
+        offlineFinance.setTag(addOfflineSO.getTag());
+        offlineFinance.setWay(addOfflineSO.getWay());
+        offlineFinance.setOccurTime(addOfflineSO.getOccurTime() == null ? new Date(): DateUtil.StringToDate (addOfflineSO.getOccurTime()));
+        offlineFinance.setCreateTime(new Date());
+        int i = offlineFinanceTOMapper.insertSelective(offlineFinance);
+        if(i > 0){
+            return new ResultMessage(ResultMessage.SUCCEED_CODE,"添加成功");
+        }else{
+            return new ResultMessage(ResultMessage.FAILED_CODE,"添加失败");
+        }
+    }
+
+    /**
+     * 更新线下财务账单
+     * @param updateOfflineSO
+     * @return
+     */
+    public ResultMessage updateOffline(UpdateOfflineSO updateOfflineSO){
+        OfflineFinance offlineFinance = new OfflineFinance();
+        offlineFinance.setId(updateOfflineSO.getId());
+        offlineFinance.setAmountNum(updateOfflineSO.getAmountNum());
+        offlineFinance.setAssociation(updateOfflineSO.getAssociation());
+        offlineFinance.setDirection(updateOfflineSO.getDirection());
+        offlineFinance.setRemark(updateOfflineSO.getRemark());
+        offlineFinance.setOccurTime(DateUtil.StringToDate(updateOfflineSO.getOccurTime()));
+        offlineFinance.setTag(updateOfflineSO.getTag());
+        offlineFinance.setWay(updateOfflineSO.getWay());
+        int i = offlineFinanceTOMapper.updateByPrimaryKeySelective(offlineFinance);
+        if(i > 0){
+            return new ResultMessage(ResultMessage.SUCCEED_CODE,"更新成功");
+        }else{
+            return new ResultMessage(ResultMessage.FAILED_CODE,"更新失败");
+        }
+    }
+
+    /**
+     * 查询线下财务账单列表
+     * @param selectOfflineListSO
+     * @return
+     */
+    public ResultMessage selectOfflineList(SelectOfflineListSO selectOfflineListSO){
+        PageHelper.startPage(selectOfflineListSO.getPageNum(), selectOfflineListSO.getPageSize());
+        Map<String,Object> paramMap = new HashMap<>();
+        paramMap.put("association",selectOfflineListSO.getAssociation());
+        paramMap.put("direction",selectOfflineListSO.getDirection());
+        paramMap.put("remark",selectOfflineListSO.getRemark());
+        paramMap.put("tag",selectOfflineListSO.getTag());
+        paramMap.put("way",selectOfflineListSO.getWay());
+        paramMap.put("startTime",selectOfflineListSO.getStartTime());
+        paramMap.put("endTime",selectOfflineListSO.getEndTime());
+        Page<OfflineFinance> page = (Page<OfflineFinance>) offlineFinanceTOMapper.selectList(paramMap);
+        Map<String, Object> resultMap = new HashMap<>();
+        resultMap.put("total",page.getTotal());
+        resultMap.put("list",page.getResult());
+        return new ResultMessage(ResultMessage.SUCCEED_CODE,ResultMessage.SUCCEED_MSG,resultMap);
+    }
+    /**
+     * 导出线下财务账单列表
+     * @param selectOfflineListSO
+     * @return
+     */
+    @Override
+    public void deriveSelectOfflineList(HttpServletResponse response, SelectOfflineListSO selectOfflineListSO) {
+            List<List<String>> excelData = new ArrayList<>();
+            //表头数据
+            List<String> header = new ArrayList<>();
+            header.add("金额");
+            header.add("收款方式");
+            header.add("收支类型");
+            header.add("标签");
+            header.add("关联信息");
+            header.add("交易时间");
+            header.add("备注");
+            header.add("创建时间");
+            excelData.add(header);
+
+            Map<String,Object> paramMap = new HashMap<>();
+            paramMap.put("association",selectOfflineListSO.getAssociation());
+            paramMap.put("direction",selectOfflineListSO.getDirection());
+            paramMap.put("remark",selectOfflineListSO.getRemark());
+            paramMap.put("tag",selectOfflineListSO.getTag());
+            paramMap.put("way",selectOfflineListSO.getWay());
+            paramMap.put("startTime",selectOfflineListSO.getStartTime());
+            paramMap.put("endTime",selectOfflineListSO.getEndTime());
+            List<OfflineFinance> list = offlineFinanceTOMapper.selectList(paramMap);
+            for(OfflineFinance offlineFinance : list){
+                List<String> content = new ArrayList<>();
+                content.add(offlineFinance.getAmountNum().toPlainString());
+                String way = "";
+                if(offlineFinance.getWay() == 0){
+                    way = "支付宝";
+                }else if(offlineFinance.getWay() == 1){
+                    way = "微信";
+                }else{
+                    way = "银行卡";
+                }
+                content.add(way);
+
+                String direction = "";
+                if(offlineFinance.getDirection() == 0){
+                    direction = "收入";
+                }else{
+                    direction = "支出";
+                }
+                content.add(direction);
+
+                String tag;
+                if(offlineFinance.getTag() == null){
+                    tag = "";
+                }else if(offlineFinance.getTag() == 0){
+                    tag = "渠道返佣";
+                }else if(offlineFinance.getTag() == 1){
+                    tag = "退款";
+                }else{
+                    tag = "采购支出";
+                }
+                content.add(tag);
+                content.add(offlineFinance.getAssociation());
+                if(offlineFinance.getOccurTime() != null){
+                    content.add(DateUtil.dateStr4(offlineFinance.getOccurTime()));
+                }else{
+                    content.add(DateUtil.dateStr4(offlineFinance.getCreateTime()));
+                }
+                content.add(offlineFinance.getRemark());
+                content.add(DateUtil.dateStr4(offlineFinance.getCreateTime()));
+                excelData.add(content);
+            }
+
+            String sheetName = "线下财务账单";
+            String fileName = "OfflineFinance.xls";
+            try{
+                ExcelUtil.exportExcel(response, excelData, sheetName, fileName, 15);
+            }catch (Exception e){
+                e.printStackTrace();
+                log.info("导出线下财务账单Execl异常:{}",e.getMessage());
+            }
+        }
+
 }

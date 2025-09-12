@@ -23,4 +23,6 @@ public class QueryCommissionDetailListVO {
     private BigDecimal commission;
     /** 消费总额 **/
     private BigDecimal consumption;
+
+    private String phone;
 }

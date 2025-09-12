@@ -177,4 +177,72 @@
     order by u.create_time desc
   </select>
 
+  <select id="selectListByStatistics" resultType="com.core.manycloudcommon.caller.vo.QueryCommissionStatisticsVO"
+          parameterType="java.lang.String">
+    SELECT
+    IFNULL(COUNT(p.user_id), 0) as userNum,
+    p.pro_user_id as userId,
+    u.email as account,
+    u.remark
+    FROM t_user_pro as p
+    LEFT JOIN t_user_info as u ON u.user_id = p.pro_user_id
+    WHERE 1 = 1
+    <if test="account != null">
+      AND (u.phone = #{account,jdbcType=VARCHAR} OR u.email = #{account,jdbcType=VARCHAR})
+    </if>
+    GROUP BY p.pro_user_id, u.email, u.remark
+  </select>
+  <select id="selectListUser" resultType="com.core.manycloudcommon.caller.vo.QueryUserProListVOTO"
+          parameterType="java.util.Map">
+    select
+    u.user_id as userId,
+    u.phone,
+    u.email,
+    u.nick_name as name,
+    u.create_time as createTime,
+    IFNULL(sum(c.consumption), 0.0) as consumptionTotal,
+    IFNULL(sum(c.commission), 0.0) as commissionTotal
+    from
+    t_user_pro as up
+    left join
+    t_user_info as u on u.user_id = up.user_id
+    left join
+    t_commission_detail as c on c.low_user_id = up.user_id
+    where
+    up.pro_user_id = #{userId,jdbcType=VARCHAR}
+    <if test="account != null">
+      and (u.phone = #{account,jdbcType=VARCHAR} or u.email = #{account,jdbcType=VARCHAR})
+    </if>
+    <if test="startTime != null">
+      and u.create_time > #{startTime,jdbcType=VARCHAR}
+    </if>
+    <if test="endTime != null">
+      and #{endTime,jdbcType=VARCHAR} > u.create_time
+    </if>
+    group by up.user_id
+    order by u.create_time desc
+  </select>
+
+
+  <select id="selectSubUserIdsByPromoterIds" resultType="java.lang.String">
+    SELECT
+    user_id
+    FROM
+    t_user_pro
+    WHERE
+    pro_user_id IN
+    <foreach item="promoterId" collection="list" separator="," open="(" close=")">
+      #{promoterId}
+    </foreach>
+  </select>
+
+
+  <select id="selectSubUserIdsByPromoterId" resultType="java.lang.String">
+    SELECT
+      user_id
+    FROM
+      t_user_pro
+    WHERE
+      pro_user_id = #{promoterId}
+  </select>
 </mapper>

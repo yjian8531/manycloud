@@ -204,5 +204,10 @@
     from t_admin_info
     where admin_id = #{value,jdbcType=VARCHAR}
   </select>
+    <select id="selectGroupingByAdmin" resultType="com.core.manycloudcommon.entity.PowerBinding"
+            parameterType="java.lang.String">
+      select * from t_admin_info  <!-- 新平台的“权限绑定表” -->
+      where type = #{adminId}
+    </select>
 
 </mapper>

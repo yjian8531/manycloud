@@ -308,6 +308,32 @@ public class CommonUtil {
     }
 
 
+    /**
+     * 隐藏手机号中间4位数字
+     * @param phoneNumber 原始手机号字符串
+     * @return 隐藏中间4位后的手机号，格式为"前3位****后4位"
+     * @throws IllegalArgumentException 如果手机号格式不正确
+     */
+    public static String hideMiddleFourDigits(String phoneNumber) {
+        // 验证输入是否为空
+        if (phoneNumber == null || phoneNumber.isEmpty()) {
+            throw new IllegalArgumentException("手机号不能为空");
+        }
+
+        // 移除非数字字符
+        String digitsOnly = phoneNumber.replaceAll("\\D+", "");
+
+        // 验证是否为11位有效手机号
+        if (digitsOnly.length() != 11) {
+            throw new IllegalArgumentException("手机号必须是11位数字");
+        }
+
+        // 提取前3位和后4位，中间用****替换
+        String prefix = digitsOnly.substring(0, 3);
+        String suffix = digitsOnly.substring(7);
+
+        return prefix + "****" + suffix;
+    }
 
 
 }

@@ -777,6 +777,9 @@ public class DateUtil {
      * @return
      */
     public static Date fomatDate(String date) {
+        if(date == null) {
+            return null; // 防止NullPointerException
+        }
         if(date.indexOf("T") > -1){
             date = date.replace("T"," ");
         }

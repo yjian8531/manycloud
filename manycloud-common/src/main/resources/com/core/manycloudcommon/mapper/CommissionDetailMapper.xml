@@ -205,4 +205,55 @@
     order by c.id desc
   </select>
 
+  <select id="selectStatisticsByUserIds" resultType="com.core.manycloudcommon.caller.vo.QueryCommissionStatisticsVO"
+          parameterType="java.util.List">
+    SELECT
+    tup.user_id as userId,
+    IFNULL(SUM(tcd.consumption), 0.0) as consumptionTotal,
+    IFNULL(SUM(tcd.commission), 0.0) as commissionTotal
+    FROM t_user_pro tup
+    LEFT JOIN t_commission_detail tcd ON tup.user_id = tcd.low_user_id  -- 被推广人ID → 消费用户ID
+    WHERE tup.user_id IN
+    <foreach item="item" collection="userIds" separator="," open="(" close=")">
+      #{item}
+    </foreach>
+    GROUP BY tup.user_id
+  </select>
+  <select id="selectListUser" resultType="com.core.manycloudcommon.vo.finance.QueryCommissionDetailListVO"
+          parameterType="java.util.Map">
+    SELECT
+    u.phone,
+    u.email,
+    u.nick_name as name,
+    c.consumption,
+    c.commission,
+    c.ratio,
+    c.create_time as createTime
+    FROM t_user_pro as up
+    LEFT JOIN t_commission_detail as c ON up.user_id = c.low_user_id
+    LEFT JOIN t_user_info as u ON up.user_id = u.user_id
+    WHERE up.pro_user_id = #{userId,jdbcType=VARCHAR}
+    <if test="account != null">
+      AND (u.phone = #{account,jdbcType=VARCHAR} OR u.email = #{account,jdbcType=VARCHAR})
+    </if>
+    <if test="startTime != null">
+      AND c.create_time > #{startTime,jdbcType=VARCHAR}
+    </if>
+    <if test="endTime != null">
+      and #{endTime,jdbcType=VARCHAR} > u.create_time
+    </if>
+    ORDER BY c.create_time DESC
+  </select>
+  <select id="selectStatisticsByPromoterId" resultType="com.core.manycloudcommon.vo.finance.QueryCommissionStatisticsVO"
+          parameterType="java.lang.String">
+    SELECT
+      tup.user_id as userId,
+      IFNULL(SUM(tcd.consumption), 0.0) as consumptionTotal,  -- 下属总消费
+      IFNULL(SUM(tcd.commission), 0.0) as commissionTotal     -- 下属总返佣
+    FROM t_user_pro tup
+           LEFT JOIN t_commission_detail tcd ON tup.user_id = tcd.low_user_id
+    WHERE tup.pro_user_id = #{promoterId}
+    GROUP BY tup.user_id
+  </select>
+
 </mapper>

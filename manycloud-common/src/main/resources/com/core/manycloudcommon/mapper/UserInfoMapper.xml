@@ -344,5 +344,58 @@
                   AND DATE_FORMAT(tii2.create_time, #{dateStyle}) &lt;= #{dateStr}
             )
     </select>
+    <select id="selectListWithLevel" resultType="com.core.manycloudcommon.vo.user.UserListVO">
+        SELECT
+        ui.user_id as userId,
+        ui.account,
+        ui.nick_name as nick,
+        li.name as levelName,
+        CAST(NULL AS CHAR) as medalName,
+        -- 推荐人的邮箱号（从t_user_pro关联t_user_info获取）
+        COALESCE(recom_user.email, '') as proAccount,
+        uf.valid_num as balance,
+        CAST(NULL AS DECIMAL(18, 2)) as consumption,
+        COALESCE(ip.num, 0) as num,
+        ui.remark,
+        ui.create_time as createTime
+        FROM t_user_info ui
+        -- 关联用户等级中间表
+        LEFT JOIN t_user_level ul ON ui.user_id = ul.user_id
+        -- 关联等级信息表，获取等级名称
+        LEFT JOIN t_level_info li ON ul.level_id = li.id
+        -- 关联用户财务表，获取可用余额
+        LEFT JOIN t_user_finance uf ON ui.user_id = uf.user_id
+        -- 子查询：统计状态为3、4的主机数量
+        LEFT JOIN (
+        SELECT user_id, COUNT(*) as num
+        FROM t_instance_info
+        WHERE status IN (3,4)
+        GROUP BY user_id
+        ) ip ON ui.user_id = ip.user_id
+        -- 关联t_user_pro表，获取推荐人ID（pro_user_id）
+        LEFT JOIN t_user_pro up ON ui.user_id = up.user_id
+        -- 通过推荐人ID关联t_user_info，获取推荐人的邮箱
+        LEFT JOIN t_user_info recom_user ON up.pro_user_id = recom_user.user_id
+        WHERE 1=1
+        <if test="account != null and account != ''">
+            AND (ui.account LIKE CONCAT('%', #{account}, '%') OR ui.nick_name LIKE CONCAT('%', #{account}, '%'))
+        </if>
+        <if test="nick != null and nick != ''">
+            AND ui.nick_name LIKE CONCAT('%', #{nick}, '%')
+        </if>
+        <if test="startTime != null and startTime != ''">
+            AND ui.create_time >= #{startTime}
+        </if>
+        <if test="endTime != null and endTime != ''">
+            <![CDATA[AND ui.create_time < DATE_ADD(#{endTime}, INTERVAL 1 DAY)]]>
+        </if>
+        <if test="status != null">
+            AND ui.status = #{status}
+        </if>
+        <if test="levelId != null">
+            AND ul.level_id = #{levelId}
+        </if>
+        ORDER BY li.level DESC, ui.create_time DESC
+    </select>
 
 </mapper>
