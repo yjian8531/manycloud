@@ -33,7 +33,7 @@ public class DashboardController {
      * @return
      */
     @PostMapping("/platform/overview")
-    public ResultMessage getPlatformOverview(@RequestBody PlatformSo  platformSo) {
+    public ResultMessage getPlatformOverview(@RequestBody(required = false) PlatformSo  platformSo) {
         return instanceService.getPlatformOverview(platformSo);
     }
 
@@ -55,7 +55,7 @@ public class DashboardController {
      * @return
      */
     @PostMapping(value = "/config/distribution",produces = {"application/json"})
-    public ResultMessage getConfigDistribution(@RequestBody PlatformSo platformSo) {
+    public ResultMessage getConfigDistribution(@RequestBody(required = false) PlatformSo platformSo) {
         return instanceService.getConfigDistribution(platformSo);
     }
 

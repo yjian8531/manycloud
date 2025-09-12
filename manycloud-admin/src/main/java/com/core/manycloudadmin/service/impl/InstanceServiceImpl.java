@@ -767,18 +767,20 @@ public class InstanceServiceImpl implements InstanceService {
         Integer inUse;
         Integer toBeRenewed;
 
-        if (platformSo.getPlatformLabel().equals("") || "全部".equals(platformSo.getPlatformLabel())) {
-            // 若未指定平台或选择"全部"，统计所有平台数据
+         // 判断平台查询条件是否为空对象
+        if (platformSo == null) {
+            // 若传入空对象，统计所有平台数据
             total = instanceInfoMapper.countTotalInstances();
             expired = instanceInfoMapper.countExpiredInstances();
             inUse = instanceInfoMapper.countInUseInstances();
             toBeRenewed = instanceInfoMapper.countToBeRenewedInstances();
         } else {
-            // 若指定了平台，只统计该平台的数据
-            total = instanceInfoMapper.countInstancesByPlatform(platformSo.getPlatformLabel());
-            expired = instanceInfoMapper.countExpiredInstancesByPlatform(platformSo.getPlatformLabel());
-            inUse = instanceInfoMapper.countInUseInstancesByPlatform(platformSo.getPlatformLabel());
-            toBeRenewed = instanceInfoMapper.countToBeRenewedInstancesByPlatform(platformSo.getPlatformLabel());
+            // 若传入非空对象，按平台名称查询
+            String platformName = platformSo.getPlatformLabel();
+            total = instanceInfoMapper.countInstancesByPlatform(platformName);
+            expired = instanceInfoMapper.countExpiredInstancesByPlatform(platformName);
+            inUse = instanceInfoMapper.countInUseInstancesByPlatform(platformName);
+            toBeRenewed = instanceInfoMapper.countToBeRenewedInstancesByPlatform(platformName);
         }
 
         data.put("total", total);
@@ -786,13 +788,14 @@ public class InstanceServiceImpl implements InstanceService {
         data.put("inUse", inUse);
         data.put("toBeRenewed", toBeRenewed);
 
-       // 2. 获取平台列表数据（若筛选单个平台则只返回该平台，否则返回所有平台）
+        // 2. 获取平台列表数据
         List<PlatformInfo> platforms;
-        if (platformSo.getPlatformLabel().equals("")|| "全部".equals(platformSo.getPlatformLabel())) {
-            platforms = platformInfoMapper.selectAll(); // 所有平台
+        if (platformSo == null) {
+            platforms = platformInfoMapper.selectAll();
         } else {
-            // 只查询指定平台（返回单个PlatformInfo对象）
-            PlatformInfo platform = platformInfoMapper.selectByLabel(platformSo.getPlatformLabel());
+            // 按平台名称查询指定平台
+            String platformName = platformSo.getPlatformLabel();
+            PlatformInfo platform = platformInfoMapper.selectByLabel(platformName);
             platforms = new ArrayList<>();
             if (platform != null) {
                 platforms.add(platform);
@@ -813,6 +816,7 @@ public class InstanceServiceImpl implements InstanceService {
 
         data.put("platformStats", platformStats);
         return new ResultMessage(ResultMessage.SUCCEED_CODE, ResultMessage.SUCCEED_MSG, data);
+
     }
 
     /**
@@ -824,9 +828,17 @@ public class InstanceServiceImpl implements InstanceService {
     public ResultMessage getConfigDistribution(PlatformSo platformSo) {
         List<Map<String, Object>> configList = instanceInfoMapper.selectConfigDistribution(platformSo);
 
-        // 封装响应数据
+       // 封装响应数据
         ConfigDistributionVO vo = new ConfigDistributionVO();
-        vo.setPlatform(platformSo.getPlatformLabel() == null || platformSo.getPlatformLabel().isEmpty() ? "全部" : platformSo.getPlatformLabel());
+
+        // 设置平台名称：仅判断对象是否为空，不处理"全部"文本
+        if (platformSo == null) {
+            // 空对象查询全部时，可根据实际需求设置平台名称，这里保持null或空字符串
+            vo.setPlatform("全部"); // 或 ""，根据前端展示需求调整
+        } else {
+            // 非空对象直接使用其平台名称
+            vo.setPlatform(platformSo.getPlatformLabel());
+        }
 
         List<ConfigItemVO> items = new ArrayList<>();
         for (Map<String, Object> item : configList) {
@@ -837,6 +849,7 @@ public class InstanceServiceImpl implements InstanceService {
             items.add(configItem);
         }
         vo.setItems(items);
+
         return new ResultMessage(ResultMessage.SUCCEED_CODE, ResultMessage.SUCCEED_MSG, vo);
     }
 
