@@ -839,4 +839,10 @@ public class InstanceServiceImpl implements InstanceService {
         vo.setItems(items);
         return new ResultMessage(ResultMessage.SUCCEED_CODE, ResultMessage.SUCCEED_MSG, vo);
     }
+
+    @Override
+    public ResultMessage selectPlatformList() {
+        List<PlatformInfo> list = platformInfoMapper.selectAll();
+        return new ResultMessage(ResultMessage.SUCCEED_CODE, ResultMessage.SUCCEED_MSG, list);
+    }
 }

@@ -6,6 +6,7 @@ import com.core.manycloudadmin.so.instance.QueryListSO;
 import com.core.manycloudadmin.so.instance.RenewSO;
 import com.core.manycloudcommon.caller.so.FinanceStatsSO;
 import com.core.manycloudcommon.caller.so.PlatformSo;
+import com.core.manycloudcommon.caller.so.UserStatsSo;
 import com.core.manycloudcommon.utils.ResultMessage;
 
 import java.math.BigDecimal;
@@ -67,6 +68,14 @@ public interface InstanceService {
      * @return
      */
     ResultMessage getConfigDistribution(PlatformSo  platformSo);
+
+
+    /**
+     * 下拉框查询所有平台
+     * @param
+     * @return
+     */
+    ResultMessage selectPlatformList();
 
 
 

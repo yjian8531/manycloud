@@ -32,7 +32,7 @@ public class DashboardController {
      * 获取平台概览
      * @return
      */
-    @GetMapping("/platform/overview")
+    @PostMapping("/platform/overview")
     public ResultMessage getPlatformOverview(@RequestBody PlatformSo  platformSo) {
         return instanceService.getPlatformOverview(platformSo);
     }
@@ -69,5 +69,13 @@ public class DashboardController {
     @PostMapping(value = "/user/stats",produces = {"application/json"})
     public ResultMessage getUserStats(@RequestBody UserStatsSo userStatsSo) {
         return UserService.queryTotalUser(userStatsSo);
+    }
+
+    /**
+     * 获取所有平台名称
+     */
+    @PostMapping(value = "/platform/list",produces = {"application/json"})
+    public ResultMessage getPlatformList() {
+        return instanceService.selectPlatformList();
     }
 }
