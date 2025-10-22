@@ -377,7 +377,7 @@ public class InstanceServiceImpl implements InstanceService {
                     /** 添加财务账单明细 **/
                     FinanceDetail financeDetail = new FinanceDetail();
                     financeDetail.setUserId(instanceInfo.getUserId());
-                    financeDetail.setFinanceNo(CommonUtil.getRandomNumber(12));
+                    financeDetail.setFinanceNo(CommonUtil.getRandomStr(12));
                     financeDetail.setProductNo(instanceInfo.getInstanceId());
                     financeDetail.setType(1);//消费类型
                     financeDetail.setMoneyNum(price);

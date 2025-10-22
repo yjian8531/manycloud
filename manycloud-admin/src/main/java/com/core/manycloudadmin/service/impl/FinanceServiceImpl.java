@@ -157,7 +157,7 @@ public class FinanceServiceImpl implements FinanceService {
 
                 FinanceDetail financeDetail = new FinanceDetail();
                 financeDetail.setUserId(financeWithdrawal.getUserId());
-                financeDetail.setFinanceNo(CommonUtil.getRandomStr(8));
+                financeDetail.setFinanceNo(CommonUtil.getRandomStr(12));
                 financeDetail.setProductNo(financeWithdrawal.getWithdrawalNo());
                 financeDetail.setType(2);//提现类型
                 financeDetail.setMoneyNum(financeWithdrawal.getMoneyNum());

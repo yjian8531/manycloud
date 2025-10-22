@@ -109,7 +109,7 @@ public class UserServiceImpl implements UserService {
             //添加账单记录
             FinanceDetail financeDetail = new FinanceDetail();
             financeDetail.setUserId(updateUserFinanceSO.getUserId());
-            financeDetail.setFinanceNo(CommonUtil.getRandomNumber(32));
+            financeDetail.setFinanceNo(CommonUtil.getRandomStr(12));
             if("add".equals(updateUserFinanceSO.getTad())){
                 financeDetail.setType(0);//类型操作
                 financeDetail.setDirection(0);//收入
