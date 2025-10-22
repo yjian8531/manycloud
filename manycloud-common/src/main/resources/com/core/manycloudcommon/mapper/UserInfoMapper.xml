@@ -294,55 +294,76 @@
         <if test="endTime != null">
             and #{endTime,jdbcType=VARCHAR} >= u.create_time
         </if>
-        order by u.id desc
-
+        order by e.level_id ASC
     </select>
 
 
     <!-- 新增用户统计 -->
     <select id="queryCreateNum" resultType="java.lang.Integer">
-        SELECT
-            COALESCE(COUNT(1), 0) AS num
-        FROM
-            t_user_info
-        WHERE
-            DATE_FORMAT(create_time, #{dateStyle}) = #{dateStr}
+        SELECT COALESCE(COUNT(1), 0) AS num
+        FROM t_user_info
+        WHERE DATE_FORMAT(create_time, #{dateStyle}) = #{dateStr}
     </select>
 
     <!-- 活跃用户统计 -->
     <select id="queryActiveNum" resultType="java.lang.Integer">
-        SELECT
-            COALESCE(COUNT(DISTINCT tui.user_id), 0) AS num  -- 去重统计用户数，防止1个用户多台主机重复计数
-        FROM
-            t_user_info tui
-                INNER JOIN
-            t_instance_info tii ON tui.user_id = tii.user_id  -- 关联用户和主机表
-        WHERE
-            tii.status IN (3, 4)  -- 活跃状态：3或4
+        SELECT COALESCE(COUNT(DISTINCT tui.user_id), 0) AS num -- 去重统计用户数，防止1个用户多台主机重复计数
+        FROM t_user_info tui
+                 INNER JOIN
+             t_instance_info tii ON tui.user_id = tii.user_id -- 关联用户和主机表
+        WHERE tii.status IN (3, 4) -- 活跃状态：3或4
           AND DATE_FORMAT(tii.create_time, #{dateStyle}) = #{dateStr}
     </select>
 
     <select id="queryInactiveNum" resultType="java.lang.Integer">
-        SELECT
-            COALESCE(COUNT(DISTINCT tui.user_id), 0) AS num
-        FROM
-            t_user_info tui
+        SELECT COALESCE(COUNT(DISTINCT tui.user_id), 0) AS num
+        FROM t_user_info tui
         WHERE
           -- 用户在当前时间区间内没有活跃主机
-            NOT EXISTS (
+            NOT EXISTS(
                     SELECT 1
                     FROM t_instance_info tii
                     WHERE tii.user_id = tui.user_id
-                      AND tii.status IN (3, 4)  -- 活跃状态
+                      AND tii.status IN (3, 4) -- 活跃状态
                       AND DATE_FORMAT(tii.create_time, #{dateStyle}) = #{dateStr}
                 )
           -- 排除从未有过主机的用户
-          AND EXISTS (
+          AND EXISTS(
                 SELECT 1
                 FROM t_instance_info tii2
                 WHERE tii2.user_id = tui.user_id
                   AND DATE_FORMAT(tii2.create_time, #{dateStyle}) &lt;= #{dateStr}
             )
+
+    </select>
+    <!-- 区间内活跃用户总数（去重）：只要在区间内有过活跃，就计为1次 -->
+    <select id="queryActiveTotal" resultType="java.lang.Integer">
+        SELECT COALESCE(COUNT(DISTINCT tui.user_id), 0) AS num
+        FROM t_user_info tui
+                 INNER JOIN t_instance_info tii ON tui.user_id = tii.user_id
+        WHERE
+            tii.status IN (3, 4) -- 活跃状态
+        <![CDATA[
+          AND DATE_FORMAT(tii.create_time, #{dateStyle}) >= #{startTime}
+          AND DATE_FORMAT(tii.create_time, #{dateStyle}) <= #{endTime}
+        ]]>
+    </select>
+    <!-- 区间内失活用户总数（去重）：区间内从未活跃，但有主机记录 -->
+    <select id="queryInactiveTotal" resultType="java.lang.Integer">
+        SELECT COALESCE(COUNT(DISTINCT tui.user_id), 0) AS num
+        FROM t_user_info tui
+        WHERE
+          -- 条件1：区间内没有任何活跃主机
+            NOT EXISTS (
+                    SELECT 1
+                    FROM t_instance_info tii
+                    WHERE tii.user_id = tui.user_id
+                      AND tii.status IN (3, 4)
+              <![CDATA[
+                      AND DATE_FORMAT(tii.create_time, #{dateStyle}) >= #{startTime}
+                      AND DATE_FORMAT(tii.create_time, #{dateStyle}) <= #{endTime}
+              ]]>
+        )
     </select>
     <select id="selectListWithLevel" resultType="com.core.manycloudcommon.vo.user.UserListVO">
         SELECT

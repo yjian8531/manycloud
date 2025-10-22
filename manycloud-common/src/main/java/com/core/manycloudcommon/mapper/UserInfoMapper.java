@@ -45,8 +45,16 @@ public interface UserInfoMapper {
     // 统计活跃用户数
     Integer queryActiveNum(@Param("dateStyle") String dateStyle, @Param("dateStr") String dateStr);
 
+
     //失活用户查询
     Integer queryInactiveNum( @Param("dateStyle") String dateStyle, @Param("dateStr") String dateStr);
+
+
+    // 统计整个区间内的活跃用户总数（去重）
+    Integer queryActiveTotal(@Param("dateStyle") String dateStyle, @Param("startTime") String startTime, @Param("endTime") String endTime);
+
+    // 统计整个区间内的失活用户总数（去重）
+    Integer queryInactiveTotal(@Param("dateStyle") String dateStyle, @Param("startTime") String startTime, @Param("endTime") String endTime);
 
 //
 //    // 查询用户列表（带等级信息）

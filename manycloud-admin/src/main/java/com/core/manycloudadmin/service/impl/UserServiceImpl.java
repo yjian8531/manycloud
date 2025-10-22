@@ -208,11 +208,13 @@ public class UserServiceImpl implements UserService {
         List<Integer> newUsersList = new ArrayList<>();
         List<Integer> activeUsersList = new ArrayList<>();
         List<Integer> inactiveUsersList = new ArrayList<>();
+        List<Integer> cumulativeActiveSumList = new ArrayList<>();
 
         // 汇总统计
         int totalNewUsers = 0;
         int totalActiveUsers = 0;
         int totalInactiveUsers = 0;
+        int cumulativeActiveUsers = 0; // 累计活跃用户计数器
 
         for (String dateStr : dateList) {
             // 查询新增用户
@@ -227,6 +229,10 @@ public class UserServiceImpl implements UserService {
             activeUsersList.add(activeNum);
             totalActiveUsers += activeNum;
 
+            // 新增：累加每日活跃数，作为累计活跃（数值相加）
+            int cumulativeSum = cumulativeActiveSumList.isEmpty() ? activeNum : cumulativeActiveSumList.get(cumulativeActiveSumList.size() - 1) + activeNum;
+            cumulativeActiveSumList.add(cumulativeSum);
+
             // 查询失活用户
             Integer inactiveNum = userInfoMapper.queryInactiveNum(dbFormatStr, dateStr);
             inactiveNum = inactiveNum == null ? 0 : inactiveNum;
@@ -237,6 +243,14 @@ public class UserServiceImpl implements UserService {
             inactiveUsersList.add(showInactive ? inactiveNum : 0);
             totalInactiveUsers += showInactive ? inactiveNum : 0;
         }
+
+        // 调用新增的两个接口，获取区间内去重的活跃和失活用户总数
+        Integer activeTotal = userInfoMapper.queryActiveTotal(dbFormatStr, startTime, endTime);
+        Integer inactiveTotal = userInfoMapper.queryInactiveTotal(dbFormatStr, startTime, endTime);
+        activeTotal = activeTotal == null ? 0 : activeTotal;
+        inactiveTotal = inactiveTotal == null ? 0 : inactiveTotal;
+
+
 
         // 计算活跃用户平均值（四舍五入）
         int activeUsersAvg = dateList.isEmpty() ? 0 :
@@ -251,8 +265,10 @@ public class UserServiceImpl implements UserService {
 
         Map<String, Object> summary = new LinkedHashMap<>();
         summary.put("newUsers", totalNewUsers);
+        summary.put("activeTotal", activeTotal); // 区间内去重的活跃用户总数
+        summary.put("cumulativeActiveSum", totalActiveUsers); // 每日活跃数累加的累计值
         summary.put("activeUsersAvg", activeUsersAvg);
-        summary.put("inactiveUsers", totalInactiveUsers);
+        summary.put("inactiveUsers", inactiveTotal); // 区间内去重的失活用户总数
         data.put("summary", summary);
 
         return new ResultMessage(ResultMessage.SUCCEED_CODE, ResultMessage.SUCCEED_MSG, data);
