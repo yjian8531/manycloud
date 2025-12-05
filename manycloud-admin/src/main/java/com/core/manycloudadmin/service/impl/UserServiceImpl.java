@@ -245,7 +245,10 @@ public class UserServiceImpl implements UserService {
         }
 
         // 调用新增的两个接口，获取区间内去重的活跃和失活用户总数
-        Integer activeTotal = userInfoMapper.queryActiveTotal(dbFormatStr, startTime, endTime);
+//        Integer activeTotal = userInfoMapper.queryActiveTotal(dbFormatStr, startTime, endTime);
+
+        Integer activeTotal = userInfoMapper.queryActiveUsersCount(startTime, endTime);
+
         Integer inactiveTotal = userInfoMapper.queryInactiveTotal(dbFormatStr, startTime, endTime);
         activeTotal = activeTotal == null ? 0 : activeTotal;
         inactiveTotal = inactiveTotal == null ? 0 : inactiveTotal;

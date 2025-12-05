@@ -416,7 +416,28 @@
         <if test="levelId != null">
             AND ul.level_id = #{levelId}
         </if>
-        ORDER BY li.level DESC, ui.create_time DESC
+        <!-- 按等级动态排序 -->
+        <choose>
+            <when test="sortOrder == 'asc'">
+                ORDER BY li.level ASC
+            </when>
+            <when test="sortOrder == 'desc'">
+                ORDER BY li.level DESC
+            </when>
+            <otherwise>
+                ORDER BY li.level ASC
+            </otherwise>
+        </choose>
     </select>
+
+<select id="queryActiveUsersCount" resultType="java.lang.Integer">
+        SELECT
+        COALESCE(COUNT(DISTINCT tui.user_id), 0) AS num
+        FROM t_user_info tui
+        INNER JOIN t_instance_info tii ON tui.user_id = tii.user_id
+        WHERE tii.status IN (3, 4)
+        AND <![CDATA[ tii.create_time <= #{endTime} ]]>
+        AND <![CDATA[ tii.end_time >= #{startTime} ]]>
+</select>
 
 </mapper>
