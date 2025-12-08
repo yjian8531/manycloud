@@ -118,36 +118,69 @@
     </if>
     order by f.create_time desc
   </select>
-    <select id="selectStatsByTimeUnit" resultType="com.core.manycloudcommon.caller.Item.FinanceStatsItem">
-      SELECT
-      <choose>
-        <when test="timeUnit == 'day'">
-          DATE(create_time) AS dateStr
-        </when>
-        <when test="timeUnit == 'month'">
-          DATE_FORMAT(create_time, '%Y-%m') AS dateStr
-        </when>
-        <otherwise>
-          YEAR(create_time) AS dateStr
-        </otherwise>
-      </choose>,
-      SUM(CASE WHEN type = 0 OR tag IN ('topup') THEN money_num ELSE 0 END) AS recharge,
-      SUM(CASE WHEN type = 1 OR tag IN ('buy','renew') THEN money_num ELSE 0 END) AS consumption,
-      SUM(CASE WHEN type = 2 OR tag = 'withdraw' THEN money_num ELSE 0 END) AS withdrawal
-      FROM t_finance_detail
-      <!-- 使用 CDATA 包裹包含特殊字符的条件 -->
-      <where>
-        <![CDATA[
-                create_time >= #{startTime}
-                AND create_time < DATE_ADD(#{endTime}, INTERVAL 1 DAY)
-            ]]>
-      </where>
-      GROUP BY dateStr
-      ORDER BY dateStr
-    </select>
+
+  <select id="selectStatsByTimeUnit" resultType="com.core.manycloudcommon.caller.Item.FinanceStatsItem">
+    SELECT
+    <choose>
+      <when test="timeUnit == 'day'">DATE(f.create_time) AS dateStr</when>
+      <when test="timeUnit == 'month'">DATE_FORMAT(f.create_time, '%Y-%m') AS dateStr</when>
+      <otherwise>YEAR(f.create_time) AS dateStr</otherwise>
+    </choose>,
+
+    <!-- 充值统计 -->
+    SUM(CASE
+    WHEN f.status = 1
+    AND (
+    -- 普通充值：需要是普通用户
+    (f.tag = 'topup' AND COALESCE(u.type, 0) = 0)
+    OR
+    -- 人工充值：不限制type
+    (f.tag = 'manage' AND f.direction = 0)
+    )
+    THEN f.money_num
+    ELSE 0
+    END) AS recharge,
+
+    <!-- 消费统计 -->
+    SUM(CASE
+    WHEN  f.status = 1
+    AND (
+    -- 普通消费：购买或续费，需要是普通用户
+    (f.tag IN ('buy', 'renew') AND COALESCE(u.type, 0) = 0)
+    OR
+    -- 人工消费：不限制用户类型
+    (f.tag = 'manage' AND f.type = 1)
+    )
+    THEN f.money_num
+    ELSE 0
+    END) AS consumption,
+
+    <!-- 提现统计 -->
+    SUM(CASE
+    WHEN f.status = 1
+    AND (
+    f.tag = 'withdraw'  -- 普通提现
+    OR (f.tag = 'manage' AND f.type = 2)  -- 人工提现
+    )
+    THEN f.money_num
+    ELSE 0
+    END) AS withdrawal
+
+    FROM t_finance_detail f
+    LEFT JOIN t_user_info u ON f.user_id = u.user_id  -- 添加用户表关联
+
+    <where>
+      <![CDATA[
+        f.create_time >= #{startTime}
+        AND f.create_time < DATE_ADD(#{endTime}, INTERVAL 1 DAY)
+        ]]>
+    </where>
+    GROUP BY dateStr
+    ORDER BY dateStr
+  </select>
 
 
-    <delete id="deleteByPrimaryKey" parameterType="java.lang.Integer" >
+  <delete id="deleteByPrimaryKey" parameterType="java.lang.Integer" >
     delete from t_finance_detail
     where id = #{id,jdbcType=INTEGER}
   </delete>

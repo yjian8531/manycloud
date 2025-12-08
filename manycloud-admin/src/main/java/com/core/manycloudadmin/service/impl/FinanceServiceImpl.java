@@ -30,6 +30,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import javax.servlet.http.HttpServletResponse;
+import java.math.BigDecimal;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.*;
@@ -191,13 +192,19 @@ public class FinanceServiceImpl implements FinanceService {
 
     }
 
+
+    /**
+     * 获取财务统计数据
+     * @param so
+     * @return
+     */
     @Override
     public ResultMessage getFinanceStats(FinanceStatsSO so) {
         String timeUnit = so.getTimeUnit();
         Date startTime = null;
         Date endTime = null;
         try {
-            // 定义日期格式，根据实际传入的日期字符串格式调整，这里假设是 yyyy-MM
+            // 定义日期格式，根据日期字符串格式调整
             SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
             startTime = sdf.parse(so.getStartTime());
             endTime = sdf.parse(so.getEndTime());
@@ -211,21 +218,41 @@ public class FinanceServiceImpl implements FinanceService {
             return new ResultMessage(ResultMessage.FAILED_CODE, "时间参数错误");
         }
 
-        // 查询数据
+        /**查询财务信息数据**/
         List<FinanceStatsItem> items = financeDetailMapper.selectStatsByTimeUnit(timeUnit, startTime, endTime);
 
         // 构造返回数据
         FinanceStatsVO vo = new FinanceStatsVO();
+        // 日期
         vo.setDates(items.stream().map(item -> item.getDateStr()).collect(Collectors.toList()));
-        vo.setRecharge(items.stream().mapToInt(item -> item.getRecharge()).boxed().collect(Collectors.toList()));
-        vo.setConsumption(items.stream().mapToInt(item -> item.getConsumption()).boxed().collect(Collectors.toList()));
-        vo.setWithdrawal(items.stream().mapToInt(item -> item.getWithdrawal()).boxed().collect(Collectors.toList()));
+        /** 充值 **/
+        vo.setRecharge(items.stream().map(item -> item.getRecharge()).collect(Collectors.toList()));
+        /** 消费 **/
+        vo.setConsumption(items.stream().map(item -> item.getConsumption()).collect(Collectors.toList()));
+        /** 提现 **/
+        vo.setWithdrawal(items.stream().map(item -> item.getWithdrawal()).collect(Collectors.toList()));
 
-        // 计算总额
+
+
         Map<String, Integer> total = new HashMap<>();
-        total.put("recharge", items.stream().mapToInt(item -> item.getRecharge()).sum());
-        total.put("consumption", items.stream().mapToInt(item -> item.getConsumption()).sum());
-        total.put("withdrawal", items.stream().mapToInt(item -> item.getWithdrawal()).sum());
+
+        /** 充值总额 **/
+        BigDecimal rechargeTotal = items.stream()
+                .map(item -> item.getRecharge())
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        total.put("recharge", rechargeTotal.intValue());
+
+        /** 消费总额 **/
+        BigDecimal consumptionTotal = items.stream()
+                .map(item -> item.getConsumption())
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        total.put("consumption", consumptionTotal.intValue());
+
+        /** 提现总额 **/
+        BigDecimal withdrawalTotal = items.stream()
+                .map(item -> item.getWithdrawal())
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        total.put("withdrawal", withdrawalTotal.intValue());
         vo.setTotal(total);
 
         return new ResultMessage(ResultMessage.SUCCEED_CODE, ResultMessage.SUCCEED_MSG, vo);
