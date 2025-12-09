@@ -43,7 +43,8 @@ public interface UserInfoMapper {
     Integer queryCreateNum(@Param("dateStyle") String dateStyle, @Param("dateStr") String dateStr);
 
     // 统计活跃用户数
-    Integer queryActiveNum(@Param("dateStyle") String dateStyle, @Param("dateStr") String dateStr);
+//    Integer queryActiveNum(@Param("dateStyle") String dateStyle, @Param("dateStr") String dateStr);
+    Integer queryActiveNum(@Param("dateStr") String dateStr);
 
     //统计活跃用户数
     Integer queryActiveUsersCount(@Param("startTime") String startTime,
@@ -60,24 +61,13 @@ public interface UserInfoMapper {
     // 统计整个区间内的失活用户总数（去重）
     Integer queryInactiveTotal(@Param("dateStyle") String dateStyle, @Param("startTime") String startTime, @Param("endTime") String endTime);
 
-//
-//    // 查询用户列表（带等级信息）
-//    List<UserListVO> selectListWithLevel(@Param("account") String account,
-//                                         @Param("nick") String nick,
-//                                         @Param("startTime") String startTime,
-//                                         @Param("endTime") String endTime,
-//                                         @Param("status") Integer status,
-//                                         @Param("levelId") Integer levelId);
-
 
     // 查询用户列表（带等级信息）
     List<UserListVO> selectListWithLevel(QueryUserLevelListSO queryUserLevelListSO);
 
+    // 统计用户总数
+    Integer queryTotalUsers();
 
-
-
-
-
-
-
+    // 查询活跃用户
+    Integer queryActiveNumNEW(@Param("dateStr") String dateStr);
 }

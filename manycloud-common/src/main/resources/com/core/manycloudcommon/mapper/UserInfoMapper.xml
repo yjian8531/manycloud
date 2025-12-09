@@ -435,9 +435,23 @@
         COALESCE(COUNT(DISTINCT tui.user_id), 0) AS num
         FROM t_user_info tui
         INNER JOIN t_instance_info tii ON tui.user_id = tii.user_id
-        WHERE tii.status IN (3, 4)
+        WHERE tii.status IN (3, 4) AND tui.type=0
         AND <![CDATA[ tii.create_time <= #{endTime} ]]>
         AND <![CDATA[ tii.end_time >= #{startTime} ]]>
 </select>
+    <select id="queryTotalUsers" resultType="java.lang.Integer">
+        SELECT COUNT(DISTINCT tui.user_id) AS num FROM t_user_info tui
+        WHERE tui.type=0
+    </select>
+    <select id="queryActiveNumNEW" resultType="java.lang.Integer" >
+        SELECT COALESCE(COUNT(DISTINCT tui.user_id), 0) AS num
+        FROM t_user_info tui
+                 INNER JOIN t_instance_info tii ON tui.user_id = tii.user_id
+        WHERE tui.type = 0
+          AND tii.status IN (3, 4)
+          AND <![CDATA[ tii.create_time <= CONCAT(#{dateStr}, ' 23:59:59') ]]>
+        AND <![CDATA[ tii.end_time >= CONCAT(#{dateStr}, ' 00:00:00')
+        ]]>
+    </select>
 
 </mapper>

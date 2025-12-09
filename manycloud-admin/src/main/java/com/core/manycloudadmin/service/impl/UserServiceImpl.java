@@ -164,7 +164,7 @@ public class UserServiceImpl implements UserService {
             return new ResultMessage("400", "时间粒度必须是 year/month/day", null);
         }
 
-        // 处理结束时间（直接使用实体类的getter方法）
+        // 处理结束时间
         String endTime = userStatsSo.getEndTime();
         if (endTime == null || endTime.trim().isEmpty()) {
             endTime = DateUtil.format(new Date(), formatStr);
@@ -208,7 +208,6 @@ public class UserServiceImpl implements UserService {
         List<Integer> newUsersList = new ArrayList<>();
         List<Integer> activeUsersList = new ArrayList<>();
         List<Integer> inactiveUsersList = new ArrayList<>();
-        List<Integer> cumulativeActiveSumList = new ArrayList<>();
 
         // 汇总统计
         int totalNewUsers = 0;
@@ -224,40 +223,26 @@ public class UserServiceImpl implements UserService {
             totalNewUsers += createNum;
 
             // 查询活跃用户
-            Integer activeNum = userInfoMapper.queryActiveNum(dbFormatStr, dateStr);
+            Integer activeNum = userInfoMapper.queryActiveNumNEW(dateStr);
             activeNum = activeNum == null ? 0 : activeNum;
             activeUsersList.add(activeNum);
             totalActiveUsers += activeNum;
 
-            // 新增：累加每日活跃数，作为累计活跃（数值相加）
-            int cumulativeSum = cumulativeActiveSumList.isEmpty() ? activeNum : cumulativeActiveSumList.get(cumulativeActiveSumList.size() - 1) + activeNum;
-            cumulativeActiveSumList.add(cumulativeSum);
+            // 查询总用户数并据此计算失活用户数
+            Integer totalUsersToDate = userInfoMapper.queryTotalUsers();  // 新增的查询
+            totalUsersToDate = totalUsersToDate == null ? 0 : totalUsersToDate;
+            Integer inactiveNum = totalUsersToDate - activeNum;  // 计算失活
+            if (inactiveNum < 0) inactiveNum = 0;  // 防止负数
+            inactiveUsersList.add(inactiveNum);
 
-            // 查询失活用户
-            Integer inactiveNum = userInfoMapper.queryInactiveNum(dbFormatStr, dateStr);
-            inactiveNum = inactiveNum == null ? 0 : inactiveNum;
-
-            // 处理是否显示失活数（使用实体类参数）
-            boolean showInactive = userStatsSo.getIncludeInactive() == null ?
-                    true : userStatsSo.getIncludeInactive();
-            inactiveUsersList.add(showInactive ? inactiveNum : 0);
-            totalInactiveUsers += showInactive ? inactiveNum : 0;
         }
 
-        // 调用新增的两个接口，获取区间内去重的活跃和失活用户总数
-//        Integer activeTotal = userInfoMapper.queryActiveTotal(dbFormatStr, startTime, endTime);
-
+        // 区间内去重 活跃用户总数
         Integer activeTotal = userInfoMapper.queryActiveUsersCount(startTime, endTime);
-
-        Integer inactiveTotal = userInfoMapper.queryInactiveTotal(dbFormatStr, startTime, endTime);
-        activeTotal = activeTotal == null ? 0 : activeTotal;
-        inactiveTotal = inactiveTotal == null ? 0 : inactiveTotal;
-
-
-
-        // 计算活跃用户平均值（四舍五入）
-        int activeUsersAvg = dateList.isEmpty() ? 0 :
-                (int) Math.round((double) totalActiveUsers / dateList.size());
+        //用户总数
+        Integer totalUsers = userInfoMapper.queryTotalUsers();
+        //失活用户总数
+        Integer inactiveTotal = totalUsers - activeTotal;
 
         // 构建响应数据
         Map<String, Object> data = new LinkedHashMap<>();
@@ -267,11 +252,9 @@ public class UserServiceImpl implements UserService {
         data.put("inactiveUsers", inactiveUsersList);
 
         Map<String, Object> summary = new LinkedHashMap<>();
-        summary.put("newUsers", totalNewUsers);
-        summary.put("activeTotal", activeTotal); // 区间内去重的活跃用户总数
-        summary.put("cumulativeActiveSum", totalActiveUsers); // 每日活跃数累加的累计值
-        summary.put("activeUsersAvg", activeUsersAvg);
-        summary.put("inactiveUsers", inactiveTotal); // 区间内去重的失活用户总数
+        summary.put("newUsers", totalNewUsers);//新增用户总数
+        summary.put("activeTotal", activeTotal); //活跃用户总数
+        summary.put("inactiveUsers", inactiveTotal); //失活用户总数
         data.put("summary", summary);
 
         return new ResultMessage(ResultMessage.SUCCEED_CODE, ResultMessage.SUCCEED_MSG, data);
