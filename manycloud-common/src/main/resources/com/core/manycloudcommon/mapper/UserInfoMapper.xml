@@ -453,5 +453,14 @@
         AND <![CDATA[ tii.end_time >= CONCAT(#{dateStr}, ' 00:00:00')
         ]]>
     </select>
+    <select id="queryActiveUserIds" resultType="java.lang.String" parameterType="java.lang.String">
+        SELECT DISTINCT tui.user_id
+        FROM t_user_info tui
+                 INNER JOIN t_instance_info tii ON tui.user_id = tii.user_id
+        WHERE tui.type = 0
+          AND tii.status IN (3, 4)
+          AND <![CDATA[ tii.create_time <= CONCAT(#{dateStr}, ' 23:59:59') ]]>
+      AND <![CDATA[ tii.end_time >= CONCAT(#{dateStr}, ' 00:00:00') ]]>
+    </select>
 
 </mapper>

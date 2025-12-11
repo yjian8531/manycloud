@@ -70,4 +70,14 @@ public interface UserInfoMapper {
 
     // 查询活跃用户
     Integer queryActiveNumNEW(@Param("dateStr") String dateStr);
+
+
+    /**
+     * 查询指定日期活跃的用户ID列表
+     *
+     * @param dateStr 日期字符串
+     * @return 活跃用户ID列表
+     */
+    List<String> queryActiveUserIds(@Param("dateStr") String dateStr);
+
 }

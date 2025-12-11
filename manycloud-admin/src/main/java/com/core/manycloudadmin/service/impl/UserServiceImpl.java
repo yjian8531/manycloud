@@ -143,17 +143,16 @@ public class UserServiceImpl implements UserService {
     }
 
 
-
     /**
      * 用户统计曲线图数据（新增、活跃、失活）
-     * 失活用户定义：相比前一天流失的用户数（昨日活跃-今日活跃）
+     * 失活用户定义：相比前一天流失的用户数（基于用户ID对比）
      * @return 统计结果
      */
     public ResultMessage queryTotalUser(UserStatsSo userStatsSo) {
         String formatStr = null;
         String dbFormatStr = null;
 
-        // 从实体类获取时间粒度参数
+        //  根据时间粒度设置日期格式
         if ("year".equals(userStatsSo.getTimeUnit())) {
             dbFormatStr = "%Y";
             formatStr = "yyyy";
@@ -191,7 +190,7 @@ public class UserServiceImpl implements UserService {
             }
         }
 
-        // 生成时间区间列表
+        //生成时间区间列表
         List<String> dateList;
         try {
             dateList = DateUtil.rangeToList(
@@ -207,68 +206,79 @@ public class UserServiceImpl implements UserService {
             return new ResultMessage("400", "开始时间不能晚于结束时间", null);
         }
 
-        // 结果数据结构
+        //初始化结果数据结构
         List<Integer> newUsersList = new ArrayList<>();
         List<Integer> activeUsersList = new ArrayList<>();
         List<Integer> inactiveUsersList = new ArrayList<>();
 
-        // 汇总统计
+        //  初始化汇总统计
         int totalNewUsers = 0;
-        int totalInactiveUsers = 0; // 失活用户总数（每日失活数的累加）
+        int totalInactiveUsers = 0;
 
         try {
-            // 计算开始时间的前一天，用于查询基准活跃用户数
-            //这个日期只用于查询，不加入返回的日期列表
+            //准备数据（开始日期的前一天）
             Date startDate = DateUtil.parse(startTime, formatStr);
             Date previousDay = DateUtil.offsetDay(startDate, -1);
             String previousDayStr = DateUtil.format(previousDay, formatStr);
 
-            // 查询活跃用户数
-            Integer previousActive = userInfoMapper.queryActiveNumNEW(previousDayStr);
-            previousActive = previousActive == null ? 0 : previousActive;
+            //  查询基准日的活跃用户
+            List<String> previousActiveUserIds = userInfoMapper.queryActiveUserIds(previousDayStr);
+            if (previousActiveUserIds == null) {
+                previousActiveUserIds = new ArrayList<>();
+            }
+            Set<String> previousActiveSet = new HashSet<>(previousActiveUserIds);
 
-            // 正常循环查询区间内的每一天
+            //  循环处理每一天的数据
             for (int i = 0; i < dateList.size(); i++) {
                 String dateStr = dateList.get(i);
 
-                // 查询新增用户
+                //查询当日新增用户数
                 Integer createNum = userInfoMapper.queryCreateNum(dbFormatStr, dateStr);
                 createNum = createNum == null ? 0 : createNum;
                 newUsersList.add(createNum);
                 totalNewUsers += createNum;
 
-                // 查询今日活跃用户
-                Integer activeNum = userInfoMapper.queryActiveNumNEW(dateStr);
-                activeNum = activeNum == null ? 0 : activeNum;
+                //查询当日活跃用户
+                List<String> currentActiveUserIds = userInfoMapper.queryActiveUserIds(dateStr);
+                if (currentActiveUserIds == null) {
+                    currentActiveUserIds = new ArrayList<>();
+                }
+                Set<String> currentActiveSet = new HashSet<>(currentActiveUserIds);
+
+                //计算当日活跃用户数
+                int activeNum = currentActiveSet.size();
                 activeUsersList.add(activeNum);
 
-                // 计算今日失活用户 = 昨日活跃 - 今日活跃
-                int inactiveNum = previousActive - activeNum;
-                if (inactiveNum < 0) {
-                    inactiveNum = 0; // 如果是负数（活跃用户增加），则失活为0
+                // 计算失活用户数（昨日活跃但今日不活跃）
+                int inactiveNum = 0;
+                if (!previousActiveSet.isEmpty()) {
+                    Set<String> inactiveSet = new HashSet<>(previousActiveSet);
+                    inactiveSet.removeAll(currentActiveSet);
+                    inactiveNum = inactiveSet.size();
                 }
+
                 inactiveUsersList.add(inactiveNum);
                 totalInactiveUsers += inactiveNum;
 
-                // 更新前一天活跃用户数，用于下一次计算
-                previousActive = activeNum;
+                //  更新前一天的用户集合
+                previousActiveSet = currentActiveSet;
             }
+
         } catch (ParseException e) {
             return new ResultMessage("500", "计算基准日失败", null);
         }
 
-        // 区间内去重的活跃用户总数
+        // 查询区间总活跃数
         Integer activeTotal = userInfoMapper.queryActiveUsersCount(startTime, endTime);
-        // 用户总数（查询当前总用户数）
-        Integer totalUsers = userInfoMapper.queryTotalUsers();
 
-        // 构建响应数据
+        //  构建响应数据
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("dates", dateList);
         data.put("newUsers", newUsersList);
         data.put("activeUsers", activeUsersList);
         data.put("inactiveUsers", inactiveUsersList);
 
+        // 构建汇总信息
         Map<String, Object> summary = new LinkedHashMap<>();
         summary.put("newUsers", totalNewUsers); // 新增用户总数
         summary.put("activeTotal", activeTotal); // 活跃用户总数（区间去重）
