@@ -1,5 +1,6 @@
 package com.core.manycloudservice.service.impl;
-
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import com.core.manycloudcommon.entity.*;
 import com.core.manycloudcommon.mapper.*;
 import com.core.manycloudcommon.utils.ResultMessage;
@@ -63,7 +64,7 @@ public class MainServiceImpl implements MainService {
     private AttributeInfoMapper attributeInfoMapper;
 
 
-
+    private static final Logger log = LoggerFactory.getLogger(MainServiceImpl.class);
 
     /**
      * 根据类型查询Banner图信息
@@ -536,6 +537,30 @@ public class MainServiceImpl implements MainService {
     }
 
 
+//    /**
+//     * 询节点可用区的配置信息
+//     * @param queryBuyNodeModelSO
+//     * @return
+//     */
+//    public ResultMessage queryBuyNodeModel(QueryBuyNodeModelSO queryBuyNodeModelSO){
+//        List<NodeModel> list = nodeModelMapper.selectByNode(queryBuyNodeModelSO.getNodeId());
+//
+//        Map<String,List<Map<String,Object>>> result = new LinkedHashMap<>();
+//
+//        for(NodeModel nodeModel : list){
+//            List<Map<String,Object>> ramList = result.get(nodeModel.getCpuVal());
+//            if(ramList == null){
+//                ramList = new ArrayList<>();
+//            }
+//            Map<String,Object> ramMap = new HashMap<>();
+//            ramMap.put("ram",nodeModel.getRamVal());
+//            ramMap.put("id",nodeModel.getId());
+//            ramList.add(ramMap);
+//
+//            result.put(nodeModel.getCpuVal(),ramList);
+//        }
+//        return new ResultMessage(ResultMessage.SUCCEED_CODE,ResultMessage.SUCCEED_MSG,result);
+//    }
     /**
      * 询节点可用区的配置信息
      * @param queryBuyNodeModelSO
@@ -544,22 +569,50 @@ public class MainServiceImpl implements MainService {
     public ResultMessage queryBuyNodeModel(QueryBuyNodeModelSO queryBuyNodeModelSO){
         List<NodeModel> list = nodeModelMapper.selectByNode(queryBuyNodeModelSO.getNodeId());
 
-        Map<String,List<Map<String,Object>>> result = new LinkedHashMap<>();
+        Map<String, List<Map<String, Object>>> result = new LinkedHashMap<>();
 
-        for(NodeModel nodeModel : list){
-            List<Map<String,Object>> ramList = result.get(nodeModel.getCpuVal());
-            if(ramList == null){
-                ramList = new ArrayList<>();
+        NodeInfo nodeInfo = nodeInfoMapper.selectByPrimaryKey(queryBuyNodeModelSO.getNodeId());
+        boolean needFilter = "UCLOUD".equals(nodeInfo != null ? nodeInfo.getLabel() : null);
+
+        String nodeName = nodeInfo != null ? nodeInfo.getNodeName() : null;
+        if (nodeName != null && (nodeName.contains("U三区") || nodeName.contains("U四区"))) {
+            needFilter = false;
+        }
+
+        for (NodeModel nodeModel : list) {
+            String cpuVal = nodeModel.getCpuVal();
+            String ramVal = nodeModel.getRamVal();
+
+            if (cpuVal == null || ramVal == null) {
+                continue;
             }
-            Map<String,Object> ramMap = new HashMap<>();
-            ramMap.put("ram",nodeModel.getRamVal());
-            ramMap.put("id",nodeModel.getId());
+
+            if (needFilter && "windows".equalsIgnoreCase(queryBuyNodeModelSO.getImageType())) {
+                try {
+                    int cpu = Integer.parseInt(cpuVal.trim());
+                    int ram = Integer.parseInt(ramVal.trim());
+
+                    if (cpu < 2 || ram < 2) {
+                        continue;
+                    }
+                } catch (NumberFormatException e) {
+                    log.warn("UCloud Windows 配置解析失败：CPU={}, RAM={}, nodeId={}", cpuVal, ramVal, queryBuyNodeModelSO.getNodeId());
+                    continue;
+                }
+            }
+
+            List<Map<String, Object>> ramList = result.computeIfAbsent(cpuVal, k -> new ArrayList<>());
+            Map<String, Object> ramMap = new HashMap<>();
+            ramMap.put("ram", ramVal);
+            ramMap.put("id", nodeModel.getId());
             ramList.add(ramMap);
 
-            result.put(nodeModel.getCpuVal(),ramList);
+            result.put(cpuVal, ramList);
         }
-        return new ResultMessage(ResultMessage.SUCCEED_CODE,ResultMessage.SUCCEED_MSG,result);
+
+        return new ResultMessage(ResultMessage.SUCCEED_CODE, ResultMessage.SUCCEED_MSG, result);
     }
+
 
     /**
      * 查询节点售卖磁盘信息
