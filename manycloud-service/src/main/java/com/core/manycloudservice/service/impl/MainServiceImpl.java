@@ -562,7 +562,7 @@ public class MainServiceImpl implements MainService {
 //        return new ResultMessage(ResultMessage.SUCCEED_CODE,ResultMessage.SUCCEED_MSG,result);
 //    }
     /**
-     * 询节点可用区的配置信息
+     * 查询节点可用区的配置信息
      * @param queryBuyNodeModelSO
      * @return
      */
