@@ -254,32 +254,46 @@
     </update>
 
     <select id="selectList" resultType="com.core.manycloudcommon.vo.user.UserListVO">
-        select
-        u.user_id as userId,
+        SELECT
+        u.user_id AS userId,
         u.account,
-        u.nick_name as nick,
-        le.name as levelName,
-        me.name as medalName,
-        up.account as proAccount,
-        uf.valid_num as balance,
+        u.nick_name AS nick,
+        le.name AS levelName,
+        me.name AS medalName,
+        up.account AS proAccount,
         u.remark,
-        u.create_time as createTime
-        from
-        t_user_info as u
-        left join
-        t_user_level as e on e.user_id = u.user_id
-        left join
-        t_level_info as le on le.id = e.level_id
-        left join
-        t_user_medal as m on m.user_id = u.user_id
-        left join
-        t_medal_info as me on me.id = m.medal_id
-        left join
-        t_user_pro as p on p.user_id = u.user_id
-        left join
-        t_user_info as up on up.user_id = p.pro_user_id
-        left join
-        t_user_finance as uf on uf.user_id = u.user_id
+        u.create_time AS createTime,
+
+        -- 1. 查询余额
+        IFNULL(uf.valid_num, 0) AS balance,
+
+        -- 2. 查询累计消费金额
+        (
+        SELECT IFNULL(SUM(fd.money_num), 0)
+        FROM t_finance_detail fd
+        WHERE fd.user_id = u.user_id
+        AND fd.type = 1      -- 1: 消费
+        AND fd.status = 1    -- 1: 完成
+        ) AS consumption,
+
+        -- 3. 查询实例数量 (新增部分)
+        (
+        SELECT COUNT(*)
+        FROM t_instance_info ii
+        WHERE ii.user_id = u.user_id
+        AND ii.status IN (3, 4) -- 3:使用中, 4:待续费
+        ) AS num
+
+        FROM
+        t_user_info AS u
+        LEFT JOIN t_user_level AS e ON e.user_id = u.user_id
+        LEFT JOIN t_level_info AS le ON le.id = e.level_id
+        LEFT JOIN t_user_medal AS m ON m.user_id = u.user_id
+        LEFT JOIN t_medal_info AS me ON me.id = m.medal_id
+        LEFT JOIN t_user_pro AS p ON p.user_id = u.user_id
+        LEFT JOIN t_user_info AS up ON up.user_id = p.pro_user_id
+        -- 关联余额表
+        LEFT JOIN t_user_finance AS uf ON uf.user_id = u.user_id
         where
         1 = 1
         <if test="account != null">
@@ -294,7 +308,9 @@
         <if test="endTime != null">
             and #{endTime,jdbcType=VARCHAR} >= u.create_time
         </if>
-        order by e.level_id ASC, u.user_id ASC
+        ORDER BY
+        e.level_id ASC,
+        u.user_id ASC
     </select>
 
 
