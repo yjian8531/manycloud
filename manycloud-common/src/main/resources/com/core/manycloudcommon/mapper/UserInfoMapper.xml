@@ -294,7 +294,7 @@
         <if test="endTime != null">
             and #{endTime,jdbcType=VARCHAR} >= u.create_time
         </if>
-        order by e.level_id ASC
+        order by e.level_id ASC, u.user_id ASC
     </select>
 
 
