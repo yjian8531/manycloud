@@ -134,7 +134,7 @@ public class FinanceServiceImpl implements FinanceService {
     @Transactional(rollbackFor = Exception.class)
     public ResultMessage execWithdrawal(ExecWithdrawalSO execWithdrawalSO){
         Integer status;
-        if("Y".equals(execWithdrawalSO.getTad())){
+        if("Y".equals(execWithdrawalSO.getTag())){
             status = 2;
         }else{
             status = 1;

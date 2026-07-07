@@ -12,7 +12,7 @@ public class ExecWithdrawalSO {
     private Integer id;
 
     /** 审核标记(Y:通过/N:驳回) **/
-    private String tad;
+    private String tag;
 
     /** 收款方式(0:支付宝,1:微信,2:银行卡) **/
     private Integer way;
