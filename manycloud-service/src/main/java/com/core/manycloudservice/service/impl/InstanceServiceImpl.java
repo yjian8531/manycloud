@@ -555,10 +555,27 @@ public class InstanceServiceImpl implements InstanceService {
                 timerTaskMapper.insertSelective(timerTask);
 
                 NodeImage nodeImage = nodeImageMapper.selectNodeParam(instanceInfo.getNodeId(),resetSO.getOs());
+
+                String osType = nodeImage.getImageType();
+                String account = null;
+                Integer port = null;
+                if(osType.toLowerCase().indexOf("windows") > -1){
+                    account = "administrator";
+                    port = 3389;
+                }else if(osType.toLowerCase().indexOf("ubuntu") > -1){
+                    account = "ubuntu";
+                    port = 22;
+                }else if(osType.toLowerCase().indexOf("centos") > -1 || osType.toLowerCase().indexOf("debian") > -1 || osType.toLowerCase().indexOf("docky") > -1){
+                    account = "root";
+                    port = 22;
+                }
+
                 InstanceInfo entity = new InstanceInfo();
                 entity.setId(instanceInfo.getId());
                 entity.setImageId(nodeImage.getId());
                 entity.setImage(nodeImage.getImageVersion());
+                entity.setConnectAccount(account);
+                entity.setConnectPort(port);
                 entity.setPowerState(PowerStateEnum.EXECUTION.getVal());
                 entity.setUpdateTime(new Date());
                 instanceInfoMapper.updateByPrimaryKeySelective(entity);

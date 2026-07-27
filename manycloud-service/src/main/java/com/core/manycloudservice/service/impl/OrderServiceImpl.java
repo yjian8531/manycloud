@@ -194,9 +194,7 @@ public class OrderServiceImpl implements OrderService {
             /** 获取用户当前VIP等级 **/
             LevelInfo levelInfo = levelInfoMapper.selectByUser(orderSO.getUserId());
             if(levelInfo != null){
-                BigDecimal discountPrice = totalPrice.multiply(levelInfo.getDiscount().divide(BigDecimal.valueOf(100))).setScale(2,BigDecimal.ROUND_UP);
-
-                totalPrice = totalPrice.subtract(discountPrice);
+                totalPrice = totalPrice.multiply(levelInfo.getDiscount()).setScale(2,BigDecimal.ROUND_UP);
             }
         }
 
