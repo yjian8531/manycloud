@@ -12,4 +12,10 @@ public class QueryFirewallSO {
    private String fwId;
    // 组id
    private String groupId;
+
+   // 地域id
+   private String RegionId;
+
+   // 实例ID（新接口专用）
+   private String instanceId;
 }

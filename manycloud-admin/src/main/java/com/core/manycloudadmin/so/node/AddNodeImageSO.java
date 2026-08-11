@@ -23,4 +23,7 @@ public class AddNodeImageSO {
     /** 备注 **/
     private String remark;
 
+    /** 镜像来源：NULL-平台默认，1-用户自定义 **/
+    private Integer imageSource;
+
 }

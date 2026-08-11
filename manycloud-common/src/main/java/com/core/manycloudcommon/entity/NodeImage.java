@@ -17,6 +17,8 @@ public class NodeImage {
 
     private Integer status;
 
+    private Integer imageSource;
+
     private Date createTime;
 
     private Date updateTime;
@@ -75,6 +77,14 @@ public class NodeImage {
 
     public void setStatus(Integer status) {
         this.status = status;
+    }
+
+    public Integer getImageSource() {
+        return imageSource;
+    }
+
+    public void setImageSource(Integer imageSource) {
+        this.imageSource = imageSource;
     }
 
     public Date getCreateTime() {

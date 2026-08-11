@@ -16,6 +16,8 @@ public interface PlatformAccountMapper {
 
     PlatformAccount selectDefault(@Param("label") String label);
 
+    PlatformAccount selectByLabelAndDel(@Param("label") String label, @Param("del") Integer del);
+
     List<PlatformAccount> selectList(@Param("label") String label,@Param("account") String account);
 
     int updateByPrimaryKeySelective(PlatformAccount record);

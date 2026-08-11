@@ -31,6 +31,13 @@
     where del = 1 and label = #{label,jdbcType=VARCHAR}
   </select>
 
+  <select id="selectByLabelAndDel" resultMap="BaseResultMap" >
+    select
+    <include refid="Base_Column_List" />
+    from t_platform_account
+    where del = #{del,jdbcType=INTEGER} and label = #{label,jdbcType=VARCHAR}
+  </select>
+
 
   <select id="selectList" resultMap="BaseResultMap">
     select

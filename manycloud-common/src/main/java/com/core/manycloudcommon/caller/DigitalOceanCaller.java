@@ -425,7 +425,30 @@ public class DigitalOceanCaller implements BaseCaller{
         headerMap.put("Authorization","Bearer "+token);
         try{
             String result = HttpRequest.sendDelete(url,headerMap);
-            JSONObject json = JSONObject.fromObject(result);
+            log.info("数字海洋销毁API响应: {}", result);
+
+            // DigitalOcean DELETE API 成功时返回 204 No Content，响应体为空是正常的
+            // 参考：https://docs.digitalocean.com/reference/api/reference/public-apis/
+            if(result == null || result.trim().isEmpty()){
+                log.info("数字海洋实例[{}]-销毁成功(204 No Content)", destroySO.getInstanceId());
+                return DestroyVO.builder()
+                        .code(CommonUtil.SUCCESS_CODE)
+                        .msg(CommonUtil.SUCCESS_MSG)
+                        .build();
+            }
+
+            // 尝试解析JSON
+            JSONObject json;
+            try{
+                json = JSONObject.fromObject(result);
+            }catch(Exception jsonException){
+                log.error("数字海洋销毁响应不是JSON格式: instanceId={}, response={}", destroySO.getInstanceId(), result);
+                return DestroyVO.builder()
+                        .code(CommonUtil.FAIL_CODE)
+                        .msg("API响应格式错误: " + result)
+                        .build();
+            }
+
             if(json.get("id") != null){
                 log.info("数字海洋实例[{}]-销毁失败:{}",destroySO.getInstanceId(),result);
                 String msg = json.getString("message");
@@ -441,9 +464,10 @@ public class DigitalOceanCaller implements BaseCaller{
             }
         }catch (Exception e){
             e.printStackTrace();
+            log.info("数字海洋实例[{}]销毁异常:{}",destroySO.getInstanceId(),e.getMessage());
             return DestroyVO.builder()
                     .code(CommonUtil.FAIL_CODE)
-                    .msg(e.getMessage())
+                    .msg("销毁异常: " + e.getMessage())
                     .build();
 
         }
@@ -487,6 +511,14 @@ public class DigitalOceanCaller implements BaseCaller{
     @Override
     public QueryFirewallVO queryFirewall(QueryFirewallSO queryFirewallSO) throws Exception {
         return  QueryFirewallVO.builder()
+                .code(CommonUtil.FAIL_CODE)
+                .msg("数字海洋-不支持此功能")
+                .build();
+    }
+
+    @Override
+    public CreateFirewallTemplateRulesVO createFirewallTemplateRules(CreateFirewallTemplateRulesSO so) {
+        return  CreateFirewallTemplateRulesVO.builder()
                 .code(CommonUtil.FAIL_CODE)
                 .msg("数字海洋-不支持此功能")
                 .build();

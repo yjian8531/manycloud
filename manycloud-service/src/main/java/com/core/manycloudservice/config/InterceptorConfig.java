@@ -1,5 +1,6 @@
 package com.core.manycloudservice.config;
 
+import com.core.manycloudservice.filter.SpecialKeyInterceptor;
 import com.core.manycloudservice.filter.UserInterceptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Configuration;
@@ -14,6 +15,10 @@ public class InterceptorConfig extends WebMvcConfigurerAdapter {
 
     @Autowired
     private UserInterceptor userInterceptor;
+
+    @Autowired
+    private SpecialKeyInterceptor specialKeyInterceptor;
+
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
 
@@ -42,6 +47,9 @@ public class InterceptorConfig extends WebMvcConfigurerAdapter {
         registry.addInterceptor(userInterceptor).addPathPatterns("/finance/**").excludePathPatterns(
                 "/finance/promotion/count"
         );
+
+        // /api/** 开放接口走私钥鉴权（不走 h-user-token 登录态）
+        registry.addInterceptor(specialKeyInterceptor).addPathPatterns("/api/**");
 
 
     }

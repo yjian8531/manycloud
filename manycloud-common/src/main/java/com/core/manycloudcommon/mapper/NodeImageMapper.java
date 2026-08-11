@@ -28,5 +28,7 @@ public interface NodeImageMapper {
 
     List<NodeImage> selectByImageVersion(String imageVersion);
 
+    NodeImage selectByParam(@Param("nodeId") Integer nodeId, @Param("imageParam") String imageParam);
+
 //    List<NodeImage> selectByNodeId(Integer id);
 }

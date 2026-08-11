@@ -10,4 +10,8 @@ public class GrantFirewallVO {
     private String code;
     private String msg;
 
+    //阿里云需要参数
+    private String requestId;
+    private String taskId;
+
 }

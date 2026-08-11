@@ -36,4 +36,8 @@ public class CreateSO {
     /** 防火墙ID **/
     private String securityGroupId;
 
+    /** AWS专用标识：特殊用户标识（用于区分是否跳过EIP创建） **/
+    private Integer awsSpecialFlag;
+
+
 }

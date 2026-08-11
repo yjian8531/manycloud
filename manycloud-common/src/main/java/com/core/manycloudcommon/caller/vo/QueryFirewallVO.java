@@ -1,5 +1,6 @@
 package com.core.manycloudcommon.caller.vo;
 
+import com.core.manycloudcommon.caller.aliyun.FirewallTemplate;
 import com.core.manycloudcommon.entity.FirewallRule;
 import lombok.Builder;
 import lombok.Data;
@@ -15,5 +16,9 @@ public class QueryFirewallVO {
     private String fwId;      // 防火墙ID
     private String name;      // 防火墙名称
     private List<FirewallRule> rules; // 新增规则信息列表字段
+
+    //阿里云需要字段
+    private String requestId;
+    private List<FirewallTemplate> firewallTemplates;
 
 }

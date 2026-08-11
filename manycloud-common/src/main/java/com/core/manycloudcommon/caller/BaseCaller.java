@@ -32,6 +32,12 @@ public interface BaseCaller {
             case "IPLIGHT":
                 caller = IpLightCaller.getClient(accountApi);
                 break;
+            case "TENCENTLH":
+                caller = TencentLighthouseCaller.getClient(accountApi);
+                break;
+//            case "ORACLE":
+//                caller = OracleCaller.getClient(accountApi);
+//                break;
             default:
                 caller = null;
         }
@@ -134,6 +140,9 @@ public interface BaseCaller {
     public UpdatePwdVO updatePwd(UpdatePwdSO updatePwdSO) throws Exception;
 
 
+
+
+
     /**
      * 创建安全组
      * @param
@@ -150,6 +159,16 @@ public interface BaseCaller {
      * @throws Exception
      */
     public QueryFirewallVO queryFirewall(QueryFirewallSO queryFirewallSO) throws Exception;
+
+
+
+    /**
+     * 阿里云创建安全组规则功能
+     * @param
+     * @return
+     * @throws Exception
+     */
+    public CreateFirewallTemplateRulesVO createFirewallTemplateRules(CreateFirewallTemplateRulesSO so);
 
 
     /**
@@ -178,37 +197,22 @@ public interface BaseCaller {
      */
     public PayVO orderPay(String orderId) throws Exception;
 
-//    /**
-//     * 获取订单列表（Iplight)
-//     */
-//    public VpsOrderListVO vpsOrderList(QueryOrderSO queryOrderSO) throws Exception;
-//
-//    /**
-//     * 获取服务器列表（Iplight)
-//     */
-//    public VpsListVO vpsList(VpsListSO vpsListSO) throws Exception;
 
 //    /**
-//     * 开机（Iplight)
+//     * 阿里云创建安全组模版
+//     * @param
+//     * @return
+//     * @throws Exception
 //     */
-//    public StartIpLightVO startIpLight(String vpsCode) throws Exception;
-//
+//    public ALICreateFirewallTemplateVO createFirewallTemplate(ALICreateFirewallTemplateSO createFirewallTemplateSO);
+
+
 //    /**
-//     * 关机（Iplight)
+//     * 阿里云查询安全组模版
+//     * @param
+//     * @return
+//     * @throws Exception
 //     */
-//    public StartIpLightVO stopIpLight(String vpsCode) throws Exception;
-
-//    /**
-//     * 续费（Iplight)
-//     */
-//    public RenewIpLightVO renewIpLight(RenewIpLightSO renewIpLightSO) throws Exception;
-//
-//    /**
-//     * 销毁（Iplight)
-//     */
-//    public StartIpLightVO unsubscribeVps(String vpsCode) throws Exception;
-
-
-
+//    public ALIQueryFirewallTemplateVO queryFirewallTemplate(ALIQueryFirewallTemplateSO querySO);
 
 }

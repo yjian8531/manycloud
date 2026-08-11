@@ -16,6 +16,9 @@ public class InstanceDetailVO {
     /** 节点名称 **/
     private String nodeName;
 
+    /** 平台标签 **/
+    private String label;
+
     /** 公网IP **/
     private String publicIp;
 
@@ -66,6 +69,8 @@ public class InstanceDetailVO {
 
     /** 结束时间 **/
     private String endTime;
+
+
 
 
 }

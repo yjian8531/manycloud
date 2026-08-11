@@ -6,6 +6,7 @@ import java.util.Date;
 @Data
 public class FirewallRule {
     private Integer id;
+    private String name; // 名称
     private String firewallId;
     private String protocol;
     private String port;
@@ -15,4 +16,7 @@ public class FirewallRule {
     private String remark;
     private Date createTime;
     private Date updateTime;
+
+    //阿里云需要字段
+    private String direction;
 }

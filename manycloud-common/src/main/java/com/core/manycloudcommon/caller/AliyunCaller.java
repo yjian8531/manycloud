@@ -4,14 +4,17 @@ import com.aliyun.teaopenapi.Client;
 import com.aliyun.teaopenapi.models.OpenApiRequest;
 import com.aliyun.teaopenapi.models.Params;
 import com.aliyun.teautil.models.RuntimeOptions;
+import com.core.manycloudcommon.caller.aliyun.FirewallTemplateRule;
 import com.core.manycloudcommon.caller.so.*;
 import com.core.manycloudcommon.caller.vo.*;
+import com.core.manycloudcommon.entity.ALiFirewallRule;
 import com.core.manycloudcommon.enums.PowerStateEnum;
 import com.core.manycloudcommon.model.AccountApi;
 import com.core.manycloudcommon.utils.CommonUtil;
 import lombok.extern.slf4j.Slf4j;
 import net.sf.json.JSONArray;
 import net.sf.json.JSONObject;
+import org.apache.commons.lang.StringUtils;
 
 import java.util.*;
 
@@ -106,6 +109,31 @@ public class AliyunCaller implements BaseCaller{
     }
 
     /**
+     * 执行请求（使用body参数，用于复杂对象数组）
+     * @param action 接口名称
+     * @param param 请求参数
+     * @return
+     * @throws Exception
+     */
+    private JSONObject execWithBody(String action, Map<String,Object> param) throws Exception{
+
+        Params params = createApiInfo(action);
+        RuntimeOptions runtime = new RuntimeOptions();
+        OpenApiRequest request;
+
+        if(param == null || param.keySet().size() == 0){
+            request = new OpenApiRequest();
+        }else{
+            // 使用body传递参数（用于复杂的对象数组）
+            request = new OpenApiRequest().setBody(com.aliyun.openapiutil.Client.parseToMap(param));
+        }
+        runtime.readTimeout = 15000;
+        Map result = client.callApi(params, request, runtime);
+
+        return JSONObject.fromObject(result.get("body"));
+    }
+
+    /**
      * 创建实例
      * @param createSO
      * @return
@@ -138,7 +166,7 @@ public class AliyunCaller implements BaseCaller{
                     .build();
         }catch (Exception e){
             e.printStackTrace();
-            log.info("ucloud-创建轻量级云主机失败：{}",e.getMessage());
+            log.info("阿里云-创建轻量级云主机失败：{}",e.getMessage());
             return CreateVO.builder()
                     .code(CommonUtil.FAIL_CODE)
                     .msg(CommonUtil.FAIL_MSG)
@@ -553,27 +581,255 @@ public class AliyunCaller implements BaseCaller{
         }
     }
 
+    /**
+     * 创建防火墙规则（轻量应用服务器SWAS）
+     **/
     public CreateSecurityVO createFirewallTo(CreateSecuritySO createSecuritySO) throws Exception {
-        return CreateSecurityVO.builder()
-                .code(CommonUtil.FAIL_CODE)
-                .msg("阿里云-不支持此功能")
-                .build();
+        // SWAS使用CreateFirewallRules API直接创建防火墙规则
+        String action = "CreateFirewallRules";
+        Map<String, Object> param = new HashMap<>();
+
+        // 必填参数
+        param.put("RegionId", regionId);
+        param.put("InstanceId", createSecuritySO.getInstanceId());
+
+        // 防火墙规则数组
+        List<Map<String, Object>> rules = new ArrayList<>();
+
+        // 处理通用格式rules
+        if (createSecuritySO.getRules() != null && !createSecuritySO.getRules().isEmpty()) {
+            for (CreateSecuritySO.FirewallRule rule : createSecuritySO.getRules()) {
+                Map<String, Object> ruleMap = new HashMap<>();
+                // 自动转大写，兼容用户输入的小写协议
+                String protocol = rule.getProtocol() != null ? rule.getProtocol().toUpperCase() : "TCP";
+                ruleMap.put("RuleProtocol", protocol);
+                ruleMap.put("Port", rule.getPort());
+                ruleMap.put("SourceCidrIp", rule.getSource());
+                if (rule.getDescription() != null) {
+                    ruleMap.put("Remark", rule.getDescription());
+                }
+                rules.add(ruleMap);
+            }
+        }
+        // 处理阿里云格式firewallRules
+        else if (createSecuritySO.getFirewallRules() != null && !createSecuritySO.getFirewallRules().isEmpty()) {
+            for (ALiFirewallRule firewallRule : createSecuritySO.getFirewallRules()) {
+                Map<String, Object> ruleMap = new HashMap<>();
+                // 自动转大写，兼容用户输入的小写协议
+                String ruleProtocol = firewallRule.getRuleProtocol() != null ? firewallRule.getRuleProtocol().toUpperCase() : "TCP";
+                ruleMap.put("RuleProtocol", ruleProtocol);
+                ruleMap.put("Port", firewallRule.getPort());
+                ruleMap.put("SourceCidrIp", firewallRule.getSourceCidrIp());
+                if (firewallRule.getRemark() != null) {
+                    ruleMap.put("Remark", firewallRule.getRemark());
+                }
+                rules.add(ruleMap);
+            }
+        }
+
+        if (!rules.isEmpty()) {
+            param.put("FirewallRules", rules);
+        }
+
+        try {
+            JSONObject result = execWithBody(action, param);  // 使用execWithBody方法
+            log.info("创建防火墙规则成功: {}", result.toString());
+
+            return CreateSecurityVO.builder()
+                    .code(CommonUtil.SUCCESS_CODE)
+                    .msg(CommonUtil.SUCCESS_MSG)
+                    .fwId(createSecuritySO.getInstanceId()) // 返回实例ID作为防火墙标识
+                    .build();
+
+        } catch (Exception e) {
+            log.error("创建防火墙规则失败: ", e);
+            return CreateSecurityVO.builder()
+                    .code(CommonUtil.FAIL_CODE)
+                    .msg("创建防火墙规则失败: " + e.getMessage())
+                    .build();
+        }
     }
 
+    /**
+     * 查询防火墙规则（轻量应用服务器SWAS）
+     **/
     @Override
     public QueryFirewallVO queryFirewall(QueryFirewallSO queryFirewallSO) throws Exception {
-        return QueryFirewallVO.builder()
-                .code(CommonUtil.FAIL_CODE)
-                .msg("阿里云-不支持此功能")
-                .build();
+        // SWAS使用ListFirewallRules API查询防火墙规则
+        String action = "ListFirewallRules";
+        Map<String, Object> param = new HashMap<>();
+
+        // 必填参数
+        param.put("RegionId", regionId);
+        // 优先使用fwId（真实的云平台实例ID），如果没有则使用instanceId
+        String realInstanceId = StringUtils.isNotEmpty(queryFirewallSO.getFwId())
+                ? queryFirewallSO.getFwId()
+                : queryFirewallSO.getInstanceId();
+        param.put("InstanceId", realInstanceId);
+
+        try {
+            JSONObject result = exec(action, param);
+//            log.info("查询防火墙规则成功: {}", result.toString());
+
+            // 解析返回数据
+            QueryFirewallVO vo = QueryFirewallVO.builder()
+                    .requestId(result.getString("RequestId"))
+                    .build();
+
+            // 解析 FirewallRules 数组
+            JSONArray firewallRulesJson = result.getJSONArray("FirewallRules");
+            List<com.core.manycloudcommon.entity.FirewallRule> rules = new ArrayList<>();
+
+            if (firewallRulesJson != null) {
+                for (Object obj : firewallRulesJson) {
+                    JSONObject ruleObj = JSONObject.fromObject(obj);
+
+                    com.core.manycloudcommon.entity.FirewallRule rule = new com.core.manycloudcommon.entity.FirewallRule();
+                    rule.setProtocol(ruleObj.getString("RuleProtocol"));
+                    rule.setPort(ruleObj.getString("Port"));
+                    rule.setIpAddress(ruleObj.getString("SourceCidrIp"));
+                    rule.setRemark(ruleObj.getString("Remark"));  // Remark对应description
+                    rule.setAction(ruleObj.getString("Policy"));   // Policy对应action
+                    rule.setFirewallId(queryFirewallSO.getInstanceId()); // 使用实例ID作为防火墙ID
+                    rules.add(rule);
+                }
+            }
+
+            // 设置返回值
+            vo.setFwId(queryFirewallSO.getInstanceId()); // 使用实例ID作为fwId
+            vo.setGroupId(queryFirewallSO.getInstanceId()); // 使用实例ID作为groupId
+            vo.setName(queryFirewallSO.getInstanceId()); // 使用实例ID作为name
+            vo.setRules(rules);
+            vo.setCode(CommonUtil.SUCCESS_CODE);
+            vo.setMsg(CommonUtil.SUCCESS_MSG);
+
+            return vo;
+
+        } catch (Exception e) {
+            log.error("查询防火墙规则失败: ", e);
+            return QueryFirewallVO.builder()
+                    .code(CommonUtil.FAIL_CODE)
+                    .msg("查询防火墙规则失败: " + e.getMessage())
+                    .build();
+        }
     }
 
     @Override
+    public CreateFirewallTemplateRulesVO createFirewallTemplateRules(CreateFirewallTemplateRulesSO so) {
+        String acction = "CreateFirewallTemplateRules";
+
+        Map<String, Object> param = new HashMap<>();
+
+        // 必填参数
+        param.put("RegionId", regionId);
+        param.put("FirewallTemplateId", so.getFirewallTemplateId());
+
+        // 防火墙规则数组
+        if (so.getFirewallRules() == null || so.getFirewallRules().isEmpty()) {
+            throw new IllegalArgumentException("防火墙规则不能为空");
+        }
+
+        List<Map<String, Object>> rules = new ArrayList<>();
+        for (ALiFirewallRule rule : so.getFirewallRules()) {
+            Map<String, Object> ruleMap = new HashMap<>();
+            ruleMap.put("RuleProtocol", rule.getRuleProtocol());
+            ruleMap.put("Port", rule.getPort());
+            ruleMap.put("SourceCidrIp", rule.getSourceCidrIp());
+            if (rule.getRemark() != null) {
+                ruleMap.put("Remark", rule.getRemark());
+            }
+            rules.add(ruleMap);
+        }
+        param.put("FirewallRule", rules);
+
+        try {
+            JSONObject result = exec(acction, param);
+            log.info("创建防火墙模板规则成功: {}", result.toString());
+
+            // 解析返回结果
+            String requestId = result.getString("RequestId");
+
+            // 解析 FirewallTemplateRules 数组
+            JSONArray rulesJson = result.getJSONArray("FirewallTemplateRules");
+            List<FirewallTemplateRule> ruleList = new ArrayList<>();
+
+            for (Object obj : rulesJson) {
+                JSONObject ruleObj = JSONObject.fromObject(obj);
+                FirewallTemplateRule rule = new FirewallTemplateRule();
+                rule.setFirewallTemplateRuleId(ruleObj.getString("FirewallTemplateRuleId"));
+                rule.setRuleProtocol(ruleObj.getString("RuleProtocol"));
+                rule.setPort(ruleObj.getString("Port"));
+                rule.setSourceCidrIp(ruleObj.getString("SourceCidrIp"));
+                rule.setRemark(ruleObj.getString("Remark"));
+                ruleList.add(rule);
+            }
+
+            return CreateFirewallTemplateRulesVO.builder()
+                    .code(CommonUtil.SUCCESS_CODE)
+                    .msg(CommonUtil.SUCCESS_MSG)
+                    .requestId(requestId)
+                    .firewallTemplateRules(ruleList)
+                    .build();
+
+        } catch (Exception e) {
+            log.error("创建防火墙模板规则失败: ", e);
+            return CreateFirewallTemplateRulesVO.builder()
+                    .code(CommonUtil.FAIL_CODE)
+                    .msg(CommonUtil.FAIL_MSG)
+                    .build();
+        }
+    }
+
+    /**
+     * 授予安全组权限
+     **/
+    @Override
     public GrantFirewallVO grantFirewall(GrantFirewallSO grantFirewallSO) throws Exception {
-        return GrantFirewallVO.builder()
-                .code(CommonUtil.FAIL_CODE)
-                .msg("阿里云-不支持此功能")
-                .build();
+        String acction = "ApplyFirewallTemplate"; // 接口名称
+
+        Map<String, Object> param = new HashMap<>();
+
+        // 必填参数
+        param.put("RegionId", regionId);
+        param.put("FirewallTemplateId", grantFirewallSO.getFirewallTemplateId());
+
+        // 实例 ID 列表（数组）
+//        List<String> instanceIds = grantFirewallSO.getInstanceIds();
+        String instanceIds = grantFirewallSO.getInstanceId();
+        if (instanceIds == null || instanceIds.isEmpty()) {
+            throw new IllegalArgumentException("实例ID列表不能为空");
+        }
+//        // 确保不超过10个
+//        if (instanceIds.size() > 10) {
+//            throw new IllegalArgumentException("实例ID数量不能超过10个");
+//        }
+        param.put("InstanceIds", JSONArray.fromObject(instanceIds).toString()); // 转为 JSON 字符串
+
+        // 可选参数：ClientToken，用于幂等性
+        param.put("ClientToken", UUID.randomUUID().toString());
+
+        try {
+            JSONObject result = exec(acction, param);
+            log.info("应用防火墙模板成功: {}", result.toString());
+
+            // 解析返回结果
+            String requestId = result.getString("RequestId");
+            String taskId = result.getString("TaskId");
+
+            return GrantFirewallVO.builder()
+                    .code(CommonUtil.SUCCESS_CODE)
+                    .msg(CommonUtil.SUCCESS_MSG)
+                    .requestId(requestId)
+                    .taskId(taskId)
+                    .build();
+
+        } catch (Exception e) {
+            log.error("应用防火墙模板失败: ", e);
+            return GrantFirewallVO.builder()
+                    .code(CommonUtil.FAIL_CODE)
+                    .msg(CommonUtil.FAIL_MSG)
+                    .build();
+        }
     }
 
     @Override
@@ -611,6 +867,8 @@ public class AliyunCaller implements BaseCaller{
                 .msg("阿里云-不支持此功能")
                 .build();
     }
+
+
 
 
     /**
