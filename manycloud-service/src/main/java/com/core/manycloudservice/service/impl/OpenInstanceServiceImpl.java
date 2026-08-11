@@ -18,6 +18,8 @@ import com.core.manycloudservice.service.InstanceService;
 import com.core.manycloudservice.service.OpenInstanceService;
 import com.core.manycloudservice.service.OrderService;
 import com.core.manycloudservice.so.order.ApiOrderSO;
+import com.core.manycloudservice.so.order.MultiRegionOrderSO;
+import com.core.manycloudservice.so.order.MultiRegionResultVO;
 import com.core.manycloudservice.so.order.OrderSO;
 import com.core.manycloudservice.vo.ApiFirewallRuleVO;
 import com.core.manycloudservice.vo.ApiQueryFirewallVO;
@@ -602,6 +604,327 @@ public class OpenInstanceServiceImpl implements OpenInstanceService {
         } else {
             return DateUtil.addDateDays(new Date(), orderInfo.getDuration() * 30);
         }
+    }
+
+    /** 多地区下单（支持不同地区同时下单） */
+    @Override
+    public ResultMessage createMultiRegion(String userId, MultiRegionOrderSO orderSO) {
+        try {
+            // 1. 参数校验
+            if(orderSO == null || orderSO.getOrders() == null || orderSO.getOrders().isEmpty()){
+                return new ResultMessage(ResultMessage.FAILED_CODE, "订单信息不能为空");
+            }
+
+            // 2. 按地区分别处理订单
+            List<MultiRegionResultVO.InstanceInfo> successInstances = new ArrayList<>();
+            List<MultiRegionResultVO.FailedOrder> failedOrders = new ArrayList<>();
+            OrderInfo globalOrderInfo = null; // 全局订单记录（只在第一个地区创建）
+            BigDecimal totalAmount = BigDecimal.valueOf(0);
+            String globalOrderNo = CommonUtil.getOnlyNo(MainEnum.ORDER); // 创建一个总订单号
+            Set<Integer> processedNodeIds = new HashSet<>(); // 记录已处理的地区ID
+
+            for(MultiRegionOrderSO.RegionOrder regionOrder : orderSO.getOrders()){
+                try {
+                    // 检查nodeId是否重复
+                    if(processedNodeIds.contains(regionOrder.getNodeId())){
+                        failedOrders.add(createFailedOrder(regionOrder, "该地区已在订单中，请合并数量"));
+                        continue;
+                    }
+                    processedNodeIds.add(regionOrder.getNodeId());
+                    // 2.1 查询配置数据
+                    NodeModel nodeModel = nodeModelMapper.selectByPrimaryKey(regionOrder.getModelId());
+                    if(nodeModel == null){
+                        failedOrders.add(createFailedOrder(regionOrder, "模版配置不存在"));
+                        continue;
+                    }
+
+                    NodeInfo nodeInfo = nodeInfoMapper.selectByPrimaryKey(regionOrder.getNodeId());
+                    if(nodeInfo == null){
+                        failedOrders.add(createFailedOrder(regionOrder, "节点配置不存在"));
+                        continue;
+                    }
+
+                    // 2.2 查询磁盘、网络配置
+                    NodeDisk nodeDisk;
+                    NodeNetwork bandwidth;
+                    NodeNetwork flow;
+                    if("Y".equals(nodeModel.getRegular())){
+                        nodeDisk = nodeDiskMapper.selectByNode(regionOrder.getNodeId(), nodeModel.getId());
+                        bandwidth = nodeNetworkMapper.selectByNode(regionOrder.getNodeId(), 0, nodeModel.getId());
+                        flow = nodeNetworkMapper.selectByNode(regionOrder.getNodeId(), 1, nodeModel.getId());
+                    }else{
+                        nodeDisk = nodeDiskMapper.selectByNode(regionOrder.getNodeId(), null);
+                        bandwidth = nodeNetworkMapper.selectByNode(regionOrder.getNodeId(), 0, null);
+                        flow = nodeNetworkMapper.selectByNode(regionOrder.getNodeId(), 1, null);
+                    }
+
+                    if(nodeDisk == null){
+                        failedOrders.add(createFailedOrder(regionOrder, "磁盘配置不存在"));
+                        continue;
+                    }
+                    if(bandwidth == null){
+                        failedOrders.add(createFailedOrder(regionOrder, "带宽配置不存在"));
+                        continue;
+                    }
+                    if(flow == null){
+                        failedOrders.add(createFailedOrder(regionOrder, "流量配置不存在"));
+                        continue;
+                    }
+
+                    // 2.3 查询镜像
+                    NodeImage nodeImage = nodeImageMapper.selectByParam(regionOrder.getNodeId(), regionOrder.getImageId());
+                    if(nodeImage == null){
+                        failedOrders.add(createFailedOrder(regionOrder, "镜像不存在"));
+                        continue;
+                    }
+
+                    // 2.4 获取默认配置并计算价格
+                    BigDecimal sysDiskSize = nodeDisk.getGiveNum() != null ? nodeDisk.getGiveNum() : BigDecimal.valueOf(50);
+                    BigDecimal dataDiskSize = nodeDisk.getMinNum() != null && nodeDisk.getGiveNum() != null
+                            ? nodeDisk.getMinNum().subtract(nodeDisk.getGiveNum())
+                            : BigDecimal.ZERO;
+                    if(dataDiskSize.compareTo(BigDecimal.ZERO) <= 0) dataDiskSize = null;
+
+                    BigDecimal bandwidthSize = bandwidth.getMinNum() != null ? bandwidth.getMinNum() : BigDecimal.ZERO;
+                    BigDecimal flowSize = flow.getMinNum() != null ? flow.getMinNum() : BigDecimal.ZERO;
+
+                    // 构建临时订单计算价格
+                    OrderSO tempOrderSO = OrderSO.builder()
+                            .nodeId(regionOrder.getNodeId())
+                            .modelId(regionOrder.getModelId())
+                            .cpu(nodeModel.getCpuVal())
+                            .ram(nodeModel.getRamVal())
+                            .sysDisk(sysDiskSize)
+                            .dataDisk(dataDiskSize)
+                            .bandwidth(bandwidthSize)
+                            .flow(flowSize)
+                            .image(nodeImage.getImageVersion())
+                            .imageId(nodeImage.getId())
+                            .num(regionOrder.getQuantity())
+                            .period(regionOrder.getPeriod())
+                            .duration(regionOrder.getPeriod())
+                            .userId(userId)
+                            .build();
+
+                    BigDecimal regionTotalPrice = orderService.queryOrderPrice(tempOrderSO);
+
+                    if(regionTotalPrice == null || regionTotalPrice.compareTo(BigDecimal.valueOf(0)) < 1){
+                        failedOrders.add(createFailedOrder(regionOrder, "无效金额"));
+                        continue;
+                    }
+
+                    // 2.5 按地区分别检查余额
+                    UserFinance uf = userFinanceMapper.selectByUserId(userId);
+                    if(uf == null || uf.getValidNum() == null || regionTotalPrice.compareTo(uf.getValidNum()) > 0){
+                        failedOrders.add(createFailedOrder(regionOrder, "余额不足"));
+                        continue;
+                    }
+
+                    // 2.6 只在第一个地区创建全局订单记录
+                    if(globalOrderInfo == null){
+                        globalOrderInfo = new OrderInfo();
+                        globalOrderInfo.setOrderNo(globalOrderNo);
+                        globalOrderInfo.setUserId(userId);
+                        // 注意：数量和价格会在所有地区处理完后更新
+                        globalOrderInfo.setNum(0); // 先设为0，后续累加
+                        globalOrderInfo.setPeriod(regionOrder.getPeriod());
+                        globalOrderInfo.setDuration(regionOrder.getPeriod());
+                        globalOrderInfo.setModelId(regionOrder.getModelId());
+                        globalOrderInfo.setPrice(BigDecimal.valueOf(0)); // 先设为0，后续累加
+                        globalOrderInfo.setOnlyPrice(BigDecimal.valueOf(0)); // 先设为0，后续累加
+                        globalOrderInfo.setDiscount(BigDecimal.valueOf(0));
+                        globalOrderInfo.setType(0);
+                        globalOrderInfo.setNodeId(regionOrder.getNodeId());
+                        globalOrderInfo.setLabel(nodeInfo.getLabel());
+                        globalOrderInfo.setCpu(nodeModel.getCpuVal());
+                        globalOrderInfo.setRam(nodeModel.getRamVal());
+                        globalOrderInfo.setSysDisk(sysDiskSize);
+                        globalOrderInfo.setDataDisk(dataDiskSize);
+                        globalOrderInfo.setBandwidth(bandwidthSize);
+                        globalOrderInfo.setFlow(flowSize);
+                        globalOrderInfo.setImage(nodeImage.getImageVersion());
+                        globalOrderInfo.setImageId(nodeImage.getId());
+                        globalOrderInfo.setStatus(0);
+                        globalOrderInfo.setCreateTime(new Date());
+                        globalOrderInfo.setUpdateTime(new Date());
+                        orderInfoMapper.insertSelective(globalOrderInfo);
+                    }
+
+                    // 2.7 创建该地区的所有实例
+                    for(int i = 0; i < regionOrder.getQuantity(); i++){
+                        InstanceInfo instanceInfo = new InstanceInfo();
+                        instanceInfo.setInstanceId(CommonUtil.getOnlyNo(MainEnum.MAIN));
+                        instanceInfo.setOrderNo(globalOrderNo); // 使用总订单号
+                        instanceInfo.setUserId(userId);
+                        instanceInfo.setType(0);
+                        instanceInfo.setNodeId(regionOrder.getNodeId());
+                        instanceInfo.setLabel(nodeInfo.getLabel());
+
+                        // 特殊用户使用del=2的特殊账号
+                        PlatformAccount platformAccount = platformAccountMapper.selectByLabelAndDel(nodeInfo.getLabel(), 2);
+                        instanceInfo.setAccountId(platformAccount.getId());
+                        instanceInfo.setModelId(regionOrder.getModelId());
+                        instanceInfo.setCpu(nodeModel.getCpuVal());
+                        instanceInfo.setRam(nodeModel.getRamVal());
+                        instanceInfo.setConnectPwd(CommonUtil.getConnectPwd(PlatformLabelEnum.getByLabel(nodeInfo.getLabel())));
+                        instanceInfo.setSysDisk(sysDiskSize);
+                        instanceInfo.setDataDisk(dataDiskSize);
+                        instanceInfo.setBandwidth(bandwidthSize);
+                        instanceInfo.setFlow(flowSize);
+                        instanceInfo.setImage(nodeImage.getImageVersion());
+                        instanceInfo.setImageId(nodeImage.getId());
+                        instanceInfo.setPeriod(regionOrder.getPeriod());
+                        instanceInfo.setStatus(0);
+                        instanceInfo.setCreateTime(new Date());
+                        // 计算到期时间
+                        if (regionOrder.getPeriod() == 0) {
+                            instanceInfo.setEndTime(DateUtil.addDateDays(new Date(), regionOrder.getPeriod()));
+                        } else if (regionOrder.getPeriod() == 1) {
+                            instanceInfo.setEndTime(DateUtil.daysBeMonth(new Date(), regionOrder.getPeriod()));
+                        } else {
+                            instanceInfo.setEndTime(DateUtil.addDateDays(new Date(), regionOrder.getPeriod() * 30));
+                        }
+                        instanceInfo.setUpdateTime(new Date());
+
+                        int insertResult = instanceInfoMapper.insertSelective(instanceInfo);
+                        if(insertResult > 0){
+                            // 添加到成功列表
+                            MultiRegionResultVO.InstanceInfo instanceVO = new MultiRegionResultVO.InstanceInfo();
+                            instanceVO.setInstanceId(instanceInfo.getInstanceId());
+                            instanceVO.setRegion(nodeInfo.getNodeName());
+                            instanceVO.setUnitPrice(regionTotalPrice.divide(BigDecimal.valueOf(regionOrder.getQuantity()), 2, BigDecimal.ROUND_DOWN).toPlainString());
+                            successInstances.add(instanceVO);
+
+                            // 创建财务明细
+                            FinanceDetail financeDetail = new FinanceDetail();
+                            financeDetail.setUserId(userId);
+                            financeDetail.setFinanceNo(CommonUtil.getRandomStr(12));
+                            financeDetail.setProductNo(instanceInfo.getInstanceId());
+                            financeDetail.setType(1);
+                            financeDetail.setMoneyNum(regionTotalPrice.divide(BigDecimal.valueOf(regionOrder.getQuantity()), 2, BigDecimal.ROUND_DOWN));
+                            financeDetail.setPeriod(regionOrder.getPeriod());
+                            financeDetail.setTag("buy");
+                            financeDetail.setDirection(1);
+                            financeDetail.setWay(2);
+                            financeDetail.setStatus(0);
+                            financeDetail.setCreateTime(new Date());
+                            financeDetail.setUpdateTime(new Date());
+                            financeDetailMapper.insertSelective(financeDetail);
+
+                            totalAmount = totalAmount.add(regionTotalPrice.divide(BigDecimal.valueOf(regionOrder.getQuantity()), 2, BigDecimal.ROUND_DOWN));
+                        }
+                    }
+
+                    // 调用云厂商API创建实例
+                    if(successInstances.size() > 0){
+                        List<InstanceInfo> regionInstances = new ArrayList<>();
+                        // 从数据库重新查询刚创建的实例
+                        for(MultiRegionResultVO.InstanceInfo instVO : successInstances){
+                            if(instVO.getRegion().equals(nodeInfo.getNodeName())){
+                                InstanceInfo dbInfo = instanceInfoMapper.selectById(instVO.getInstanceId());
+                                if(dbInfo != null){
+                                    regionInstances.add(dbInfo);
+                                }
+                            }
+                        }
+
+                        Map<String, Boolean> apiResult = doCreateInstance(regionInstances);
+                        // 找出当前地区失败的实例（只检查当前地区的实例）
+                        List<MultiRegionResultVO.InstanceInfo> failedInstances = new ArrayList<>();
+                        for(MultiRegionResultVO.InstanceInfo instVO : successInstances){
+                            // 只检查当前地区的实例
+                            if(!instVO.getRegion().equals(nodeInfo.getNodeName())){
+                                continue;
+                            }
+                            InstanceInfo dbInfo = instanceInfoMapper.selectById(instVO.getInstanceId());
+                            Boolean result = dbInfo != null ? apiResult.get(dbInfo.getInstanceId()) : null;
+                            if(result == null || !result){
+                                failedInstances.add(instVO);
+                            }
+                        }
+
+                        // 处理失败的实例：扣减金额并删除记录
+                        for(MultiRegionResultVO.InstanceInfo failedInst : failedInstances){
+                            if(failedInst.getUnitPrice() != null){
+                                try{
+                                    totalAmount = totalAmount.subtract(new BigDecimal(failedInst.getUnitPrice()));
+                                } catch (NumberFormatException e){
+                                    log.warn("实例{}单价格式错误：{}", failedInst.getInstanceId(), failedInst.getUnitPrice());
+                                }
+                            }
+                            InstanceInfo dbInfo = instanceInfoMapper.selectById(failedInst.getInstanceId());
+                            if(dbInfo != null && dbInfo.getId() != null){
+                                instanceInfoMapper.deleteByPrimaryKey(dbInfo.getId());
+                            }
+                        }
+
+                        // 从成功列表中移除失败的实例
+                        successInstances.removeIf(instVO ->
+                            failedInstances.stream().anyMatch(failed -> failed.getInstanceId().equals(instVO.getInstanceId()))
+                        );
+                    }
+
+                } catch(Exception e){
+                    log.error("[开放接口]多地区下单-地区[{}]处理异常：{}", regionOrder.getNodeId(), e.getMessage(), e);
+                    failedOrders.add(createFailedOrder(regionOrder, "处理异常：" + e.getMessage()));
+                }
+            }
+
+            // 3. 更新订单状态和冻结金额
+            if(successInstances.size() > 0){
+                // 更新全局订单：设置正确的数量和价格
+                OrderInfo updateOrder = new OrderInfo();
+                updateOrder.setId(globalOrderInfo.getId());
+                updateOrder.setNum(successInstances.size()); // 成功实例总数
+                updateOrder.setPrice(totalAmount); // 总金额
+                if(successInstances.size() > 0){
+                    updateOrder.setOnlyPrice(totalAmount.divide(BigDecimal.valueOf(successInstances.size()), 2, BigDecimal.ROUND_DOWN)); // 平均单价
+                }
+                updateOrder.setStatus(2); // 部分/全部成功
+                updateOrder.setUpdateTime(new Date());
+                orderInfoMapper.updateByPrimaryKeySelective(updateOrder);
+
+                // 扣款
+                int i = userFinanceMapper.updateBalanceByUserId(userId, "seal", totalAmount);
+                if(i > 0){
+                    UserFinance latest = userFinanceMapper.selectByUserId(userId);
+                    balanceLogMapper.insertChange(userId, "seal", totalAmount, latest.getValidNum(), "多地区下单冻结金额");
+                }
+            }
+
+            // 4. 构建返回结果
+            MultiRegionResultVO resultVO = new MultiRegionResultVO();
+            resultVO.setOrderNo(globalOrderNo);
+            resultVO.setSuccessNum(successInstances.size());
+            resultVO.setTotalAmount(totalAmount.toPlainString());
+            resultVO.setInstances(successInstances);
+            // 只在有失败订单时才设置failed字段
+            if(failedOrders != null && !failedOrders.isEmpty()){
+                resultVO.setFailed(failedOrders);
+            }
+
+            if(successInstances.size() > 0){
+                return new ResultMessage(ResultMessage.SUCCEED_CODE, "下单成功", resultVO);
+            }else{
+                return new ResultMessage(ResultMessage.FAILED_CODE, "下单失败", resultVO);
+            }
+
+        } catch (Exception e) {
+            log.error("[开放接口]多地区下单异常：{}", e.getMessage(), e);
+            return new ResultMessage(ResultMessage.FAILED_CODE, "下单异常：" + e.getMessage());
+        }
+    }
+
+    /** 辅助方法：创建失败订单对象 */
+    private MultiRegionResultVO.FailedOrder createFailedOrder(MultiRegionOrderSO.RegionOrder regionOrder, String errorMsg){
+        MultiRegionResultVO.FailedOrder failedOrder = new MultiRegionResultVO.FailedOrder();
+        failedOrder.setNodeId(regionOrder.getNodeId());
+        // 通过nodeId查询地区名称
+        NodeInfo nodeInfo = nodeInfoMapper.selectByPrimaryKey(regionOrder.getNodeId());
+        failedOrder.setRegion(nodeInfo != null ? nodeInfo.getNodeName() : "未知地区");
+        failedOrder.setQuantity(regionOrder.getQuantity());
+        failedOrder.setError(errorMsg);
+        return failedOrder;
     }
 
 }

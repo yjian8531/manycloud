@@ -4,6 +4,7 @@ import com.core.manycloudcommon.caller.so.CreateSecuritySO;
 import com.core.manycloudcommon.caller.so.QueryFirewallSO;
 import com.core.manycloudcommon.utils.ResultMessage;
 import com.core.manycloudservice.so.order.ApiOrderSO;
+import com.core.manycloudservice.so.order.MultiRegionOrderSO;
 import com.core.manycloudservice.so.order.RenewSO;
 
 /**
@@ -14,6 +15,9 @@ public interface OpenInstanceService {
 
     /** 下单（只传必要参数，其他配置自动查询） */
     ResultMessage create(String userId, ApiOrderSO apiOrderSO);
+
+    /** 多地区下单（支持不同地区同时下单） */
+    ResultMessage createMultiRegion(String userId, MultiRegionOrderSO orderSO);
 
     /** 主机详情 */
     ResultMessage detail(String userId, String instanceId);

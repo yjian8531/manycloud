@@ -7,6 +7,7 @@ import com.core.manycloudservice.filter.SpecialKeyInterceptor;
 import com.core.manycloudservice.service.OpenInstanceService;
 import com.core.manycloudservice.so.order.ApiOrderSO;
 import com.core.manycloudservice.so.order.InstanceIdSO;
+import com.core.manycloudservice.so.order.MultiRegionOrderSO;
 import com.core.manycloudservice.so.order.RenewSO;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -31,6 +32,12 @@ public class ApiInstanceController {
     @PostMapping("/create")
     public ResultMessage create(@RequestBody ApiOrderSO apiOrderSO, HttpServletRequest request) {
         return openInstanceService.create(getSpecialUserId(request), apiOrderSO);
+    }
+
+    /** 多地区下单（支持不同地区的多台主机同时下单） */
+    @PostMapping("/createMultiRegion")
+    public ResultMessage createMultiRegion(@RequestBody MultiRegionOrderSO orderSO, HttpServletRequest request) {
+        return openInstanceService.createMultiRegion(getSpecialUserId(request), orderSO);
     }
 
 
