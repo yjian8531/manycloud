@@ -112,6 +112,7 @@ public class InstanceServiceImpl implements InstanceService {
         InstanceDetailVO detailVO = InstanceDetailVO.builder()
                 .instanceId(instanceInfo.getInstanceId())
                 .nodeName(nodeName)
+                .label(instanceInfo.getLabel())
                 .publicIp(instanceInfo.getPublicIp())
                 .privateIp(instanceInfo.getPrivateIp())
                 .connectPort(instanceInfo.getConnectPort())
