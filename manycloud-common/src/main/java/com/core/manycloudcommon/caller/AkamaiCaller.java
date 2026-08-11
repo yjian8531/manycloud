@@ -586,7 +586,7 @@ public class AkamaiCaller implements BaseCaller{
     public CreateFirewallTemplateRulesVO createFirewallTemplateRules(CreateFirewallTemplateRulesSO so) {
         return CreateFirewallTemplateRulesVO.builder()
                 .code(CommonUtil.FAIL_CODE)
-                .msg("阿卡麦-不支持此功能")
+                .msg("阿卡麦-不支持此功能 ")
                 .build();
     }
 
