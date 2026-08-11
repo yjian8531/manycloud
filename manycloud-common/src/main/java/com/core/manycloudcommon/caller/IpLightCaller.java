@@ -704,6 +704,14 @@ public class IpLightCaller implements BaseCaller {
                 .build();
     }
 
+    @Override
+    public CreateFirewallTemplateRulesVO createFirewallTemplateRules(CreateFirewallTemplateRulesSO so) {
+        return CreateFirewallTemplateRulesVO.builder()
+                .code(CommonUtil.FAIL_CODE)
+                .msg("IpLight-不支持此功能")
+                .build();
+    }
+
     /**
      * 绑定防火墙
      *
