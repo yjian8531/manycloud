@@ -1069,4 +1069,13 @@ public class UcloudCaller implements BaseCaller{
         }
 
     }
+
+    @Override
+    public CreateFirewallTemplateRulesVO createFirewallTemplateRules(CreateFirewallTemplateRulesSO so) {
+        return CreateFirewallTemplateRulesVO.builder()
+                .code(CommonUtil.FAIL_CODE)
+                .msg("Ucloud-不支持此功能")
+                .build();
+    }
+
 }

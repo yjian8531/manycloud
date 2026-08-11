@@ -1044,4 +1044,12 @@ public class RcloudCaller implements BaseCaller{
 
     }
 
+    @Override
+    public CreateFirewallTemplateRulesVO createFirewallTemplateRules(CreateFirewallTemplateRulesSO so) {
+        return CreateFirewallTemplateRulesVO.builder()
+                .code(CommonUtil.FAIL_CODE)
+                .msg("Rcloud-不支持此功能")
+                .build();
+    }
+
 }
