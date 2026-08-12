@@ -34,7 +34,7 @@ public class ApiInstanceController {
         return openInstanceService.create(getSpecialUserId(request), apiOrderSO);
     }
 
-    /** 多地区下单（支持不同地区的多台主机同时下单） */
+    /** 多地区下单 （支持不同地区的多台主机同时下单） */
     @PostMapping("/createMultiRegion")
     public ResultMessage createMultiRegion(@RequestBody MultiRegionOrderSO orderSO, HttpServletRequest request) {
         return openInstanceService.createMultiRegion(getSpecialUserId(request), orderSO);

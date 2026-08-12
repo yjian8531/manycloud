@@ -4,7 +4,7 @@ import lombok.Data;
 import java.util.List;
 
 /**
- * 多地区下单返回数据类
+ * 多地区下单返回数据
  */
 @Data
 public class MultiRegionResultVO {

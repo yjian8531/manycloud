@@ -4,7 +4,7 @@ import lombok.Data;
 import java.util.List;
 
 /**
- * 多地区下单参数类
+ * 多地区下单参数
  */
 @Data
 public class MultiRegionOrderSO {

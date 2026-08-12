@@ -9,14 +9,14 @@ import com.core.manycloudservice.so.order.RenewSO;
 
 /**
  * 特殊用户开放接口(/api/instance)业务层
- * userId 均来自私钥鉴权(SpecialKeyInterceptor)，不走登录态
+ * userId 均来自私钥鉴权(SpecialKeyInterceptor)，不走登录
  */
 public interface OpenInstanceService {
 
     /** 下单（只传必要参数，其他配置自动查询） */
     ResultMessage create(String userId, ApiOrderSO apiOrderSO);
 
-    /** 多地区下单（支持不同地区同时下单） */
+    /** 多地区下单（支持不同地区同时下单）  */
     ResultMessage createMultiRegion(String userId, MultiRegionOrderSO orderSO);
 
     /** 主机详情 */

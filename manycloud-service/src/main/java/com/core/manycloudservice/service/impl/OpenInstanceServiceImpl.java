@@ -399,7 +399,7 @@ public class OpenInstanceServiceImpl implements OpenInstanceService {
     }
 
 
-    // ============================== 查询 / 操作 ==============================
+    //查询操作
 
     @Override
     public ResultMessage detail(String userId, String instanceId) {

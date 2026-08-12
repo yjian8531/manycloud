@@ -98,7 +98,7 @@ public class InstanceServiceImpl implements InstanceService {
     }
 
     /**
-     * 查询实例详情信息
+     * 查询实例的详情信息
      * @param queryDetailSO
      * @return
      */
