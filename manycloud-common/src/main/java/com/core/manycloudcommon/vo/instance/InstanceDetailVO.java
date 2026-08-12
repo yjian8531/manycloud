@@ -4,7 +4,7 @@ import lombok.Builder;
 import lombok.Data;
 
 /**
- * 实例详情数据VO
+ * 实例详情数据
  */
 @Data
 @Builder
