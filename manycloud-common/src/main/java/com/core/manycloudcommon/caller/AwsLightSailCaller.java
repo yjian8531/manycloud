@@ -680,7 +680,9 @@ public class AwsLightSailCaller implements BaseCaller{
                 FirewallRule rule = new FirewallRule();
                 rule.setFirewallId(instanceName);
                 rule.setProtocol(portState.protocol().toString());
-                rule.setPort(portState.fromPort() + "-" + portState.toPort());
+                //修改端口显示
+                String portRange = portState.fromPort().equals(portState.toPort()) ? String.valueOf(portState.fromPort()) : portState.fromPort() + "-" + portState.toPort();
+                rule.setPort(portRange);
                 rule.setIpAddress(portState.cidrs() != null && !portState.cidrs().isEmpty() ?
                         portState.cidrs().get(0) : "0.0.0.0/0");
                 rule.setAction("accept");
