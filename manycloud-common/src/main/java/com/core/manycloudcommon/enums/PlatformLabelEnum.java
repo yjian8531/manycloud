@@ -3,7 +3,7 @@ package com.core.manycloudcommon.enums;
 public enum PlatformLabelEnum {
 
     ALIYUN("阿里云","ALIYUN",true,true),
-    AWSLS("AWS LightSail","AWSLS",false,false),
+    AWSLS("AWS LightSail","AWSLS",true,false),
     UCLOUD("Ucloud","UCLOUD",false,true),
     RCLOUD("Rcloud","RCLOUD",false,true),
     DOPLA("数字海洋","DOPLA",false,false),

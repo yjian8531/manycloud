@@ -231,7 +231,7 @@ public class CreateInstanceTimer {
      */
     @Scheduled(cron = "0 */1 * * * ?")
     public void createInstanceContinue(){
-        List<TimerTask> timerTasks = timerTaskMapper.selectPendingByType(TaskTypeEnum.AHZ_BUY_CTE.getType());
+         List<TimerTask> timerTasks = timerTaskMapper.selectPendingByType(TaskTypeEnum.AHZ_BUY_CTE.getType());
 
         for(TimerTask timerTask : timerTasks){
 
@@ -308,20 +308,34 @@ public class CreateInstanceTimer {
 
                 }else if(PlatformLabelEnum.AWSLS.getLabel().equals(instanceInfo.getLabel())){
 
-                    if(PowerStateEnum.RUNNING.getVal().equals(queryDetailVO.getPowerState())){
-                        /** AWS 主机 创建完成后需要重新设置一下密码 **/
-                        UpdatePwdSO updatePwdSO = UpdatePwdSO.builder()
-                                .instanceId(serviceNo)
-                                .pwd(instanceInfo.getConnectPwd())
-                                .build();
-                        UpdatePwdVO up = caller.updatePwd(updatePwdSO);
-                        if(CommonUtil.SUCCESS_CODE.equals(up.getCode())){
-                            bl = true;
-                        }else{
-                            log.info("AWS LightSail 初始化重置密码失败：{}",up.getMsg());
-                        }
-                    }
+                    /** AWS主机 创建完成后需要SSH设置root密码（照阿里云模式：改密成功才算完成） **/
 
+                    if("N".equals(timerTask.getTag())){//未改密
+
+                        if(PowerStateEnum.RUNNING.getVal().equals(queryDetailVO.getPowerState())){
+                            /** 运行中主机直接SSH改root密码 **/
+                            UpdatePwdSO updatePwdSO = UpdatePwdSO.builder()
+                                    .instanceId(serviceNo)
+                                    .pwd(instanceInfo.getConnectPwd())
+                                    .build();
+                            UpdatePwdVO up = caller.updatePwd(updatePwdSO);
+                            if(CommonUtil.SUCCESS_CODE.equals(up.getCode())){
+                                timerTask.setTag("Y");//标记已改密
+                                timerTask.setUpdateTime(new Date());
+                                timerTaskMapper.updateByPrimaryKeySelective(timerTask);
+                            }else{
+                                log.info("AWS实例[{}]初始化设置root密码失败：{}", serviceNo, up.getMsg());
+                                //失败下个周期自动重试（tag仍为N）
+                            }
+                        }
+
+                    }else if("Y".equals(timerTask.getTag())){//已改密
+
+                        if(PowerStateEnum.RUNNING.getVal().equals(queryDetailVO.getPowerState())){
+                            bl = true;
+                        }
+
+                    }
 
                 }
 
@@ -329,6 +343,15 @@ public class CreateInstanceTimer {
                 if(bl){
                     /** 实例创建完成 **/
                     complete(instanceInfo,serviceNo,queryDetailVO,nodeInfo.getNodeName());
+
+                    /** AWS实例连接账号显示为root（complete里写入的是平台默认账号） **/
+                    if(PlatformLabelEnum.AWSLS.getLabel().equals(instanceInfo.getLabel())){
+                        InstanceInfo ist = new InstanceInfo();
+                        ist.setId(instanceInfo.getId());
+                        ist.setConnectAccount("root");
+                        ist.setUpdateTime(new Date());
+                        instanceInfoMapper.updateByPrimaryKeySelective(ist);
+                    }
 
                     timerTask.setStatus(2);
                     timerTask.setUpdateTime(new Date());
@@ -414,10 +437,5 @@ public class CreateInstanceTimer {
             orderInfoMapper.updateByPrimaryKeySelective(orderInfo);
         }
     }
-
-
-
-
-
 
 }

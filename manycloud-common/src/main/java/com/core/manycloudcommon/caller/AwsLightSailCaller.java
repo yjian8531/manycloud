@@ -118,32 +118,26 @@ public class AwsLightSailCaller implements BaseCaller{
                 String zone = bz[0];
                 String bundle = bz[1];
 
-                String keyName = CommonUtil.getRandomStr(10);
-                CreateKeyPairRequest pairRequest = CreateKeyPairRequest.builder()
-                        .keyPairName(keyName)
-                        .build();
-                CreateKeyPairResponse pairResponse = caller.createKeyPair(pairRequest);
-                KeyPair keyPair = pairResponse.keyPair();
-                FileUtil.saveFile(keyPair.name()+".pem",pairResponse.privateKeyBase64());
-
-                // 特殊用户：直接创建实例，不创建EIP，支持快照创建
                 if (isSpecialUser) {
-                    // 特殊用户使用快照创建实例，需要用专门的API
-                    String[] bundleParts = bundle.split("_");
-                    String bundleSize = bundleParts[0]; // nano, micro等
-                    String bundleBundleId = bundle; // 完整bundle ID
-
                     caller.createInstancesFromSnapshot(CreateInstancesFromSnapshotRequest.builder()
                             .instanceNames(instanceId)
                             .instanceSnapshotName(createSO.getImageId())  // 使用快照名称
-                            .bundleId(bundleBundleId)
+                            .bundleId(bundle)
                             .availabilityZone(zone)
-                            .keyPairName(keyPair.name())
                             .build());
                     log.info("AWS LightSail 特殊用户创建实例（跳过EIP）: {}", instanceId);
                 }
                 // 普通用户：先创建EIP，再创建实例
                 else {
+                    // blueprint创建的实例需要自定义密钥对
+                    String keyName = CommonUtil.getRandomStr(10);
+                    CreateKeyPairRequest pairRequest = CreateKeyPairRequest.builder()
+                            .keyPairName(keyName)
+                            .build();
+                    CreateKeyPairResponse pairResponse = caller.createKeyPair(pairRequest);
+                    KeyPair keyPair = pairResponse.keyPair();
+                    FileUtil.saveFile(keyPair.name()+".pem",pairResponse.privateKeyBase64());
+
                     // 先创建EIP
                     String eipId = "eip-"+ str;
                     AllocateStaticIpResponse response = caller.allocateStaticIp(AllocateStaticIpRequest.builder()
@@ -525,11 +519,26 @@ public class AwsLightSailCaller implements BaseCaller{
 
             String pwd = updatePwdSO.getPwd();
             String keyName = instance.sshKeyName();
+
             // 创建JSch对象
             JSch jsch = new JSch();
-            jsch.addIdentity(keyName, keyPairResponse.privateKeyBase64().getBytes(), keyPairResponse.publicKeyBase64().getBytes(), null);
+
+            // AWS返回的是PEM格式密钥，直接使用
+            byte[] privateKeyBytes = keyPairResponse.privateKeyBase64().getBytes();
+            byte[] publicKeyBytes = keyPairResponse.publicKeyBase64() != null
+                    ? keyPairResponse.publicKeyBase64().getBytes() : null;
+
+            jsch.addIdentity(keyName, privateKeyBytes, publicKeyBytes, null);
+
             // 根据用户名，主机ip，端口获取一个Session对象
-            Session session = jsch.getSession(instance.username(), instance.publicIpAddress(), 22);
+            // 使用AWS返回的实际用户名（可能是ec2-user、ubuntu、bitnami等）
+            String sshUser = instance.username();
+            if (sshUser == null || sshUser.isEmpty()) {
+                sshUser = "ec2-user"; // 如果没有返回用户名，使用默认值
+            }
+            Session session = jsch.getSession(sshUser, instance.publicIpAddress(), 22);
+
+            log.info("AWS LightSail SSH连接信息: 用户={}, IP={}", sshUser, instance.publicIpAddress());
 
             // 设置timeout时间
             session.setTimeout(60000000);
@@ -538,7 +547,17 @@ public class AwsLightSailCaller implements BaseCaller{
             config.put("StrictHostKeyChecking", "no");
             session.setConfig(config);
             // 通过Session建立链接
-            session.connect();
+            try {
+                session.connect();
+                log.info("AWS LightSail SSH连接成功！");
+            } catch (Exception e) {
+                log.error("AWS LightSail SSH连接失败: {}", e.getMessage());
+                session.disconnect();
+                return UpdatePwdVO.builder()
+                        .code(CommonUtil.FAIL_CODE)
+                        .msg("SSH连接失败: " + e.getMessage())
+                        .build();
+            }
             String str = "echo root:{pwd} |sudo chpasswd root";
             str = str.replace("{pwd}", pwd);
             String[] command = {
@@ -574,8 +593,6 @@ public class AwsLightSailCaller implements BaseCaller{
                     .msg(e.getMessage())
                     .build();
         }
-
-
 
     }
 
@@ -758,6 +775,22 @@ public class AwsLightSailCaller implements BaseCaller{
                 .code(CommonUtil.FAIL_CODE)
                 .msg("AWS-不支持此功能")
                 .build();
+    }
+
+    /**
+     * 从PEM格式公钥中提取Base64内容并解码
+     */
+    private byte[] extractPublicKey(String publicKeyPem) {
+        try {
+            String publicKeyBase64 = publicKeyPem
+                .replace("-----BEGIN PUBLIC KEY-----", "")
+                .replace("-----END PUBLIC KEY-----", "")
+                .replaceAll("\\s", "");
+            return java.util.Base64.getDecoder().decode(publicKeyBase64);
+        } catch (Exception e) {
+            log.warn("公钥解码失败，返回null: {}", e.getMessage());
+            return null;
+        }
     }
 
 }
