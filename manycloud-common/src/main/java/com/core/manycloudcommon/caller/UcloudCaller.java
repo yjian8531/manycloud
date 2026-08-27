@@ -199,6 +199,22 @@ public class UcloudCaller implements BaseCaller{
                     }else if("centos".equals(osType.toLowerCase()) || "debian".equals(osType.toLowerCase()) || "docky".equals(osType.toLowerCase())){
                         account = "root";
                         port = 22;
+                    }else{
+                        // 平台新返回OsType="Linux"，改用OsName（如"高内核CentOS 7.9 64位"）判断发行版
+                        String osName = instance.optString("OsName","").toLowerCase();
+                        if(osName.contains("windows")){
+                            account = "administrator";
+                            port = 3389;
+                        }else if(osName.contains("ubuntu")){
+                            account = "ubuntu";
+                            port = 22;
+                        }else if(osName.contains("centos") || osName.contains("debian") || osName.contains("docky")){
+                            account = "root";
+                            port = 22;
+                        }else if(osName.contains("linux")){
+                            account = "root";// Linux默认root
+                            port = 22;
+                        }
                     }
 
                     QueryDetailVO odvo = QueryDetailVO.builder()
@@ -327,6 +343,22 @@ public class UcloudCaller implements BaseCaller{
                 }else if("centos".equals(osType) || "debian".equals(osType) || "docky".equals(osType)){
                     account = "root";
                     port = 22;
+                }else{
+                    // 平台新返回OsType="Linux"，改用OsName（如"高内核CentOS 7.9 64位"）判断发行版
+                    String osName = instance.optString("OsName","").toLowerCase();
+                    if(osName.contains("windows")){
+                        account = "administrator";
+                        port = 3389;
+                    }else if(osName.contains("ubuntu")){
+                        account = "ubuntu";
+                        port = 22;
+                    }else if(osName.contains("centos") || osName.contains("debian") || osName.contains("docky")){
+                        account = "root";
+                        port = 22;
+                    }else if(osName.contains("linux")){
+                        account = "root";// Linux默认root
+                        port = 22;
+                    }
                 }
 
                 QueryDetailVO odvo = QueryDetailVO.builder()
@@ -431,10 +463,6 @@ public class UcloudCaller implements BaseCaller{
      * @throws Exception
      */
     public CreateSecurityVO createFirewallTo(CreateSecuritySO createSecuritySO) throws Exception {
-        // 先获取端口字符串并校验格式和范围
-        String portStr = createSecuritySO.getPort();
-        validatePort(portStr); // 调用校验方法
-
         Map<String, String> param = new TreeMap<>();
         param.put("Action", "CreateFirewall");
         param.put("PublicKey", pubKey);
@@ -444,14 +472,28 @@ public class UcloudCaller implements BaseCaller{
         }
         param.put("Name", createSecuritySO.getName());
 
-        // 解析动态端口，生成规则
-        List<String> dynamicPorts = parsePortString(portStr); // 解析端口字符串
-        int ruleIndex = 0; // 从 Rule.0 开始添加规则
-
-        for (String port : dynamicPorts) {
-            // 添加 TCP 和 UDP 规则
-            param.put("Rule." + ruleIndex++, "TCP|" + port + "|0.0.0.0/0|ACCEPT|HIGH|开的TCP" + port + "端口");
-            param.put("Rule." + ruleIndex++, "UDP|" + port + "|0.0.0.0/0|ACCEPT|HIGH|开的UDP" + port + "端口");
+        int ruleIndex = 0;
+        List<CreateSecuritySO.FirewallRule> rules = createSecuritySO.getRules();
+        if (rules != null && !rules.isEmpty()) {
+            // 新接口格式：按每条规则的协议/端口/源IP/描述生成
+            for (CreateSecuritySO.FirewallRule rule : rules) {
+                String protocol = StringUtils.isNotEmpty(rule.getProtocol()) ? rule.getProtocol().toUpperCase() : "TCP";
+                String port = rule.getPort();
+                validatePort(port);
+                String source = StringUtils.isNotEmpty(rule.getSource()) ? rule.getSource() : "0.0.0.0/0";
+                String remark = StringUtils.isNotEmpty(rule.getDescription()) ? rule.getDescription() : "开的" + protocol + port + "端口";
+                // UCloud规则格式：协议|端口|源IP|动作|优先级|备注
+                param.put("Rule." + ruleIndex++, protocol + "|" + port + "|" + source + "|ACCEPT|HIGH|" + remark);
+            }
+        } else {
+            // 旧格式：仅传port字符串，默认TCP+UDP双协议
+            String portStr = createSecuritySO.getPort();
+            validatePort(portStr);
+            List<String> dynamicPorts = parsePortString(portStr);
+            for (String port : dynamicPorts) {
+                param.put("Rule." + ruleIndex++, "TCP|" + port + "|0.0.0.0/0|ACCEPT|HIGH|开的TCP" + port + "端口");
+                param.put("Rule." + ruleIndex++, "UDP|" + port + "|0.0.0.0/0|ACCEPT|HIGH|开的UDP" + port + "端口");
+            }
         }
 
         // 生成签名并调用 API
@@ -532,6 +574,43 @@ public class UcloudCaller implements BaseCaller{
 
 
     /**
+     * 查询主机绑定的安全组GroupId集合（DescribeSecurityGroup按ResourceId查）
+     */
+    private Set<String> queryBoundGroupIds(String resourceId) {
+        Set<String> groupIds = new HashSet<>();
+        try {
+            Map<String,String> param = new TreeMap<>();
+            param.put("Action","DescribeSecurityGroup");
+            param.put("PublicKey",pubKey);
+            param.put("Region",regionId);
+            if(StringUtils.isNotEmpty(projectId)){
+                param.put("ProjectId",projectId);
+            }
+            param.put("ResourceType","ulhost");
+            param.put("ResourceId",resourceId);
+            String signature = getSignature(param,pivKey);
+            param.put("Signature",signature);
+            String str = HttpRequest.post(url,param);
+//            log.info("Ucloud-DescribeSecurityGroup响应：{}",str);
+            JSONObject json = JSONObject.fromObject(str);
+            if(json.getInt("RetCode") == 0){
+                JSONArray dataSet = json.optJSONArray("DataSet");
+                if(dataSet != null){
+                    for(int i = 0; i < dataSet.size(); i++){
+                        String gId = dataSet.getJSONObject(i).optString("GroupId");
+                        if(StringUtils.isNotEmpty(gId)){
+                            groupIds.add(gId);
+                        }
+                    }
+                }
+            }
+        } catch (Exception e) {
+            log.info("Ucloud-查询主机绑定安全组异常：{}", e.getMessage());
+        }
+        return groupIds;
+    }
+
+    /**
      * 查询防火墙
      * @param queryFirewallSO
      * @return
@@ -563,13 +642,23 @@ public class UcloudCaller implements BaseCaller{
 
         if(json.getInt("RetCode") == 0){
             JSONArray dataArray = json.getJSONArray("DataSet");
+            // 按主机查询时：先调DescribeSecurityGroup拿该主机绑定的GroupId集合
+            Set<String> boundGroupIds = null;
+            if(StringUtils.isEmpty(queryFirewallSO.getFwId())
+                    && StringUtils.isEmpty(queryFirewallSO.getName())
+                    && StringUtils.isNotEmpty(queryFirewallSO.getInstanceId())){
+                boundGroupIds = queryBoundGroupIds(queryFirewallSO.getInstanceId());
+            }
             for(int i = 0 ; i < dataArray.size() ; i++){
                 JSONObject data = dataArray.getJSONObject(i);
                 boolean isMatch = false;
                 if(StringUtils.isNotEmpty(queryFirewallSO.getFwId())){
                     isMatch = queryFirewallSO.getFwId().equals(data.getString("FWId"));
-                }else{
+                }else if(StringUtils.isNotEmpty(queryFirewallSO.getName())){
                     isMatch = queryFirewallSO.getName().equals(data.getString("Name"));
+                }else if(boundGroupIds != null){
+                    // 该主机绑定的安全组中包含此防火墙
+                    isMatch = boundGroupIds.contains(data.getString("GroupId"));
                 }
                 if (isMatch) {
                     groupId = data.getString("GroupId");
@@ -587,12 +676,15 @@ public class UcloudCaller implements BaseCaller{
                             ruleInfo.setAction(rule.optString("RuleAction"));
                             ruleInfo.setPriority(rule.optString("Priority"));
                             ruleInfo.setIpAddress(rule.optString("SrcIP"));
+                            ruleInfo.setRemark(rule.optString("Remark"));
                             rules.add(ruleInfo);
                         }
                     }
                     break;
                 }
             }
+        }else{
+            log.info("Ucloud查防火墙失败：{}",str);
         }
         return QueryFirewallVO.builder()
                 .groupId(groupId)
@@ -601,6 +693,14 @@ public class UcloudCaller implements BaseCaller{
                 .rules(rules) // 将解析出的规则信息设置到返回对象中
                 .code(CommonUtil.SUCCESS_CODE)
                 .msg("查询成功")
+                .build();
+    }
+
+    @Override
+    public CreateFirewallTemplateRulesVO createFirewallTemplateRules(CreateFirewallTemplateRulesSO so) {
+        return CreateFirewallTemplateRulesVO.builder()
+                .code(CommonUtil.FAIL_CODE)
+                .msg("Ucloud-不支持此功能")
                 .build();
     }
 
@@ -957,6 +1057,14 @@ public class UcloudCaller implements BaseCaller{
      * @return
      */
     public DestroyVO destroy(DestroySO destroySO)throws Exception{
+        /** UCloud要求主机必须先关机(SHUTOFF)才能销毁，否则报8204，这里先检查并关机 **/
+        if(!waitULHostShutoff(destroySO.getInstanceId())){
+            log.info("ucloud-轻量级云主机{} 销毁失败：主机未能关机",destroySO.getInstanceId());
+            return DestroyVO.builder()
+                    .code(CommonUtil.FAIL_CODE)
+                    .msg(CommonUtil.FAIL_MSG)
+                    .build();
+        }
         Map<String,String> param = new TreeMap<>();
         param.put("Action","TerminateULHostInstance");
         param.put("PublicKey",pubKey);
@@ -971,6 +1079,7 @@ public class UcloudCaller implements BaseCaller{
         String str = HttpRequest.post(url,param);
         JSONObject json = JSONObject.fromObject(str);
         if(json.getInt("RetCode") == 0){
+            log.info("ucloud-轻量级云主机{} 销毁成功",destroySO.getInstanceId());
             return DestroyVO.builder()
                     .code(CommonUtil.SUCCESS_CODE)
                     .msg(CommonUtil.SUCCESS_MSG)
@@ -982,6 +1091,66 @@ public class UcloudCaller implements BaseCaller{
                     .msg(CommonUtil.FAIL_MSG)
                     .build();
         }
+    }
+
+    /**
+     * 确保轻量云主机关机(SHUTOFF)，供销毁前调用
+     * 已关机直接返回true；否则发起关机并轮询等待，超时返回false
+     */
+    private boolean waitULHostShutoff(String instanceId)throws Exception{
+        String state = getULHostState(instanceId);
+        if("Stopped".equalsIgnoreCase(state)){
+            return true;
+        }
+        if(state == null){
+            return false;
+        }
+        /** 先关机 **/
+        StopVO stopVO = stop(StopSO.builder().instanceId(instanceId).build());
+        if(CommonUtil.FAIL_CODE == stopVO.getCode()){
+            log.info("ucloud-轻量级云主机{} 销毁前关机失败",instanceId);
+            return false;
+        }
+        /** 轮询等待关机完成，最多等120秒 **/
+        for(int i = 0; i < 24; i++){
+            Thread.sleep(5000);
+            state = getULHostState(instanceId);
+            if("Stopped".equalsIgnoreCase(state)){
+                return true;
+            }
+            /** null说明主机已查询不到(可能已被销毁)，放行 **/
+            if(state == null){
+                return true;
+            }
+        }
+        log.info("ucloud-轻量级云主机{} 等待关机超时，当前状态：{}",instanceId,state);
+        return false;
+    }
+
+    /**
+     * 查询单台轻量云主机状态，查询不到返回null
+     */
+    private String getULHostState(String instanceId)throws Exception{
+        Map<String,String> param = new TreeMap<>();
+        param.put("Action","DescribeULHostInstance");
+        param.put("PublicKey",pubKey);
+        if(StringUtils.isNotEmpty(projectId)){
+            param.put("ProjectId",projectId);
+        }
+        param.put("Region",regionId);
+        param.put("ULHostIds.0",instanceId);
+        String signature = getSignature(param,pivKey);
+        param.put("Signature",signature);
+        String str = HttpRequest.post(url,param);
+        JSONObject json = JSONObject.fromObject(str);
+        if(json.getInt("RetCode") != 0){
+            return null;
+        }
+        JSONArray instances = json.getJSONArray("ULHostInstanceSets");
+        if(instances == null || instances.isEmpty()){
+            return null;
+        }
+        return JSONObject.fromObject(instances.get(0)).getString("State");
     }
 
     /**
@@ -1007,9 +1176,75 @@ public class UcloudCaller implements BaseCaller{
             e.printStackTrace();
             return null;
         }
+
+
     }
 
 
+
+    /**
+     * 查询轻量应用主机套餐列表 (DescribeULHostBundles)
+     * 用于获取不同规格对应的 BundleId (ProductType)
+     *
+     * @param describeSO 查询参数
+     * @return UcloudBundleVO 包含套餐列表
+     * @throws Exception 请求异常
+     */
+    public UcloudBundleVO describeULHostBundles(DescribeULHostBundlesSO describeSO) throws Exception {
+        Map<String, String> param = new TreeMap<>();
+        param.put("Action", "DescribeULHostBundles");
+
+        if (StringUtils.isNotEmpty(projectId)) {
+            param.put("ProjectId", projectId);
+        }
+
+        param.put("PublicKey", pubKey);
+        param.put("Region", regionId);
+
+        // 可选：如果 SO 中指定了镜像类型，添加该参数
+        if (describeSO != null && StringUtils.isNotEmpty(describeSO.getImageType())) {
+            param.put("ImageType", describeSO.getImageType());
+        }
+
+        String signature = getSignature(param, pivKey);
+        param.put("Signature", signature);
+
+        String str = HttpRequest.post(url, param);
+        JSONObject json = JSONObject.fromObject(str);
+
+        if (json.getInt("RetCode") == 0) {
+            JSONArray dataSet = json.getJSONArray("DataSet");
+            List<UcloudBundleVO.BundleInfo> bundleList = new ArrayList<>();
+
+            for (int i = 0; i < dataSet.size(); i++) {
+                JSONObject item = dataSet.getJSONObject(i);
+
+                UcloudBundleVO.BundleInfo info = new UcloudBundleVO.BundleInfo();
+                info.setBundleId(item.optString("BundleId"));
+                info.setName(item.optString("Name"));
+                info.setCpu(item.optInt("CPU"));
+                info.setMemory(item.optInt("Memory"));
+                info.setDisk(item.optInt("SysDiskSpace"));
+                info.setBandwidth(item.optInt("Bandwidth"));
+                info.setTraffic(item.optInt("TrafficPacket"));
+                info.setPrice(item.optDouble("Price", 0.0));
+                bundleList.add(info);
+            }
+
+            return UcloudBundleVO.builder()
+                    .code(CommonUtil.SUCCESS_CODE)
+                    .msg(CommonUtil.SUCCESS_MSG)
+                    .bundles(bundleList)
+                    .build();
+        } else {
+            log.info("ucloud-查询轻量主机套餐列表失败：{}", str);
+            return UcloudBundleVO.builder()
+                    .code(CommonUtil.FAIL_CODE)
+                    .msg("查询失败：" + json.optString("Message", str))
+                    .bundles(new ArrayList<>())
+                    .build();
+        }
+    }
 
 
 
@@ -1070,12 +1305,31 @@ public class UcloudCaller implements BaseCaller{
 
     }
 
-    @Override
-    public CreateFirewallTemplateRulesVO createFirewallTemplateRules(CreateFirewallTemplateRulesSO so) {
-        return CreateFirewallTemplateRulesVO.builder()
-                .code(CommonUtil.FAIL_CODE)
-                .msg("Ucloud-不支持此功能")
-                .build();
+    /**
+     * 查询轻量应用主机套餐列表 (DescribeULHostBundles)
+     * 用于获取不同规格对应的 BundleId (ProductType)
+     *
+     * @return UcloudBundleVO 包含套餐列表
+     * @throws Exception 请求异常
+     */
+    public String describeULHostBundles() throws Exception {
+        Map<String, String> param = new TreeMap<>();
+        param.put("Action", "DescribeULHostBundles");
+
+        if (StringUtils.isNotEmpty(projectId)) {
+            param.put("ProjectId", projectId);
+        }
+
+        param.put("PublicKey", pubKey);
+        param.put("Region", regionId);
+        // 可选：如果需要特定镜像类型过滤，可以添加 ImageType 参数，这里先不加以获取所有
+
+        String signature = getSignature(param, pivKey);
+        param.put("Signature", signature);
+
+        String str = HttpRequest.post(url, param);
+        JSONObject json = JSONObject.fromObject(str);
+        return str;
     }
 
 }

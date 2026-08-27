@@ -5,6 +5,9 @@ import lombok.Data;
 
 @Data
 @Builder
+/**
+ * 查询防火墙参数
+ */
 public class QueryFirewallSO {
    // 名称
    private String name;

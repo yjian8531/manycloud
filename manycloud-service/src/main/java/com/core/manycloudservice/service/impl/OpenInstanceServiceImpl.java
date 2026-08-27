@@ -13,6 +13,8 @@ import com.core.manycloudcommon.model.AccountApi;
 import com.core.manycloudcommon.utils.CommonUtil;
 import com.core.manycloudcommon.utils.DateUtil;
 import com.core.manycloudcommon.utils.ResultMessage;
+import com.core.manycloudcommon.caller.so.GrantFirewallSO;
+import com.core.manycloudcommon.caller.so.QueryFirewallSO;
 import com.core.manycloudcommon.utils.StringUtils;
 import com.core.manycloudservice.service.InstanceService;
 import com.core.manycloudservice.service.OpenInstanceService;
@@ -135,12 +137,9 @@ public class OpenInstanceServiceImpl implements OpenInstanceService {
                 return new ResultMessage(ResultMessage.FAILED_CODE, "镜像不存在");
             }
 
-            // 5. 获取默认配置
-            BigDecimal sysDiskSize = nodeDisk.getGiveNum() != null ? nodeDisk.getGiveNum() : BigDecimal.valueOf(50);
-            BigDecimal dataDiskSize = nodeDisk.getMinNum() != null && nodeDisk.getGiveNum() != null
-                    ? nodeDisk.getMinNum().subtract(nodeDisk.getGiveNum())
-                    : BigDecimal.ZERO;
-            if (dataDiskSize.compareTo(BigDecimal.ZERO) <= 0) dataDiskSize = null;
+            // 5. 获取默认配置（系统盘=套餐配置的磁盘大小min_num；数据盘无。give_num是赠送容量不能作为系统盘大小，否则Rcloud等平台会收到0G系统盘导致建机失败）
+            BigDecimal sysDiskSize = nodeDisk.getMinNum() != null ? nodeDisk.getMinNum() : BigDecimal.valueOf(50);
+            BigDecimal dataDiskSize = null;
 
             BigDecimal bandwidthSize = bandwidth.getMinNum() != null ? bandwidth.getMinNum() : BigDecimal.ZERO;
             BigDecimal flowSize = flow.getMinNum() != null ? flow.getMinNum() : BigDecimal.ZERO;
@@ -477,7 +476,30 @@ public class OpenInstanceServiceImpl implements OpenInstanceService {
             if(vo != null && CommonUtil.SUCCESS_CODE.equals(vo.getCode())){
                 Map<String, Object> data = new HashMap<>();
                 data.put("fwId", vo.getFwId());
-                return new ResultMessage(ResultMessage.SUCCEED_CODE, "安全组规则创建成功", data);
+
+                // 查询GroupId并绑定到实例（参考 InstanceServiceImpl.createFirewall）
+                QueryFirewallSO queryFirewallSO = QueryFirewallSO.builder()
+                        .name(createSecuritySO.getName())
+                        .fwId(vo.getFwId())
+                        .build();
+                QueryFirewallVO queryFirewallVO = caller.queryFirewall(queryFirewallSO);
+                if(queryFirewallVO != null && StringUtils.isNotEmpty(queryFirewallVO.getGroupId())){
+                    data.put("groupId", queryFirewallVO.getGroupId());
+                    GrantFirewallSO grantFirewallSO = GrantFirewallSO.builder()
+                            .groupId(queryFirewallVO.getGroupId())
+                            .instanceId(info.getServiceNo())
+                            .build();
+                    GrantFirewallVO bindResult = caller.grantFirewall(grantFirewallSO);
+                    if(bindResult == null || !bindResult.isSuccess()){
+                        String errMsg = bindResult == null ? "无响应" : bindResult.getMsg();
+                        log.info("[开放接口]Rcloud安全组绑定失败：{}", errMsg);
+                        return new ResultMessage(ResultMessage.FAILED_CODE, "安全组创建成功但绑定失败：" + errMsg, data);
+                    }
+                }else{
+                    return new ResultMessage(ResultMessage.FAILED_CODE, "安全组创建成功但查询GroupId失败", data);
+                }
+
+                return new ResultMessage(ResultMessage.SUCCEED_CODE, "安全组创建并绑定成功", data);
             }
             return new ResultMessage(ResultMessage.FAILED_CODE, "安全组规则创建失败");
         }catch (Exception e){
@@ -501,8 +523,13 @@ public class OpenInstanceServiceImpl implements OpenInstanceService {
         }
         try{
             BaseCaller caller = buildCaller(info);
-            // 将真实的云平台实例ID设置回 queryFirewallSO，供底层 caller 使用
-            queryFirewallSO.setFwId(info.getServiceNo());
+            if("RCLOUD".equals(info.getLabel()) || "UCLOUD".equals(info.getLabel())){
+                // Rcloud/Ucloud：fwId是真实的防火墙ID，保留用户传入值；serviceNo放instanceId供按绑定资源匹配
+                queryFirewallSO.setInstanceId(info.getServiceNo());
+            }else{
+                // 阿里云/AWS等：fwId字段承载真实的云平台实例ID（沿用原有约定）
+                queryFirewallSO.setFwId(info.getServiceNo());
+            }
             QueryFirewallVO callerVo = caller.queryFirewall(queryFirewallSO);
 
             // 转换为友好的API响应格式
@@ -641,12 +668,30 @@ public class OpenInstanceServiceImpl implements OpenInstanceService {
                         continue; // 节点不存在，跳过
                     }
 
+                    //查询磁盘/带宽/流量默认配置（防止queryOrderPrice计价时空指针）
+                    NodeDisk estDisk;
+                    NodeNetwork estBandwidth;
+                    NodeNetwork estFlow;
+                    if("Y".equals(nodeModel.getRegular())){
+                        estDisk = nodeDiskMapper.selectByNode(regionOrder.getNodeId(), nodeModel.getId());
+                        estBandwidth = nodeNetworkMapper.selectByNode(regionOrder.getNodeId(), 0, nodeModel.getId());
+                        estFlow = nodeNetworkMapper.selectByNode(regionOrder.getNodeId(), 1, nodeModel.getId());
+                    }else{
+                        estDisk = nodeDiskMapper.selectByNode(regionOrder.getNodeId(), null);
+                        estBandwidth = nodeNetworkMapper.selectByNode(regionOrder.getNodeId(), 0, null);
+                        estFlow = nodeNetworkMapper.selectByNode(regionOrder.getNodeId(), 1, null);
+                    }
+
                     // 构建简化的价格查询对象
                     OrderSO tempOrderSO = OrderSO.builder()
                             .nodeId(regionOrder.getNodeId())
                             .modelId(regionOrder.getModelId())
                             .cpu(nodeModel.getCpuVal())
                             .ram(nodeModel.getRamVal())
+                            .sysDisk(estDisk != null && estDisk.getGiveNum() != null ? estDisk.getGiveNum() : BigDecimal.valueOf(50))
+                            .dataDisk(null)
+                            .bandwidth(estBandwidth != null && estBandwidth.getMinNum() != null ? estBandwidth.getMinNum() : BigDecimal.ZERO)
+                            .flow(estFlow != null && estFlow.getMinNum() != null ? estFlow.getMinNum() : BigDecimal.ZERO)
                             .num(regionOrder.getQuantity())
                             .period(regionOrder.getPeriod())
                             .duration(regionOrder.getPeriod())
@@ -733,12 +778,9 @@ public class OpenInstanceServiceImpl implements OpenInstanceService {
                         continue;
                     }
 
-                    //获取默认配置并计算价格
-                    BigDecimal sysDiskSize = nodeDisk.getGiveNum() != null ? nodeDisk.getGiveNum() : BigDecimal.valueOf(50);
-                    BigDecimal dataDiskSize = nodeDisk.getMinNum() != null && nodeDisk.getGiveNum() != null
-                            ? nodeDisk.getMinNum().subtract(nodeDisk.getGiveNum())
-                            : BigDecimal.ZERO;
-                    if(dataDiskSize.compareTo(BigDecimal.ZERO) <= 0) dataDiskSize = null;
+                    //获取默认配置并计算价格（系统盘=min_num；数据盘无。同单地区下单逻辑）
+                    BigDecimal sysDiskSize = nodeDisk.getMinNum() != null ? nodeDisk.getMinNum() : BigDecimal.valueOf(50);
+                    BigDecimal dataDiskSize = null;
 
                     BigDecimal bandwidthSize = bandwidth.getMinNum() != null ? bandwidth.getMinNum() : BigDecimal.ZERO;
                     BigDecimal flowSize = flow.getMinNum() != null ? flow.getMinNum() : BigDecimal.ZERO;

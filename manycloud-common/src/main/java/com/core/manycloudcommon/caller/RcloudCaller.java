@@ -2,6 +2,7 @@ package com.core.manycloudcommon.caller;
 
 import com.core.manycloudcommon.caller.so.*;
 import com.core.manycloudcommon.caller.vo.*;
+import com.core.manycloudcommon.entity.FirewallRule;
 import com.core.manycloudcommon.enums.PowerStateEnum;
 import com.core.manycloudcommon.model.AccountApi;
 import com.core.manycloudcommon.utils.CommonUtil;
@@ -728,11 +729,145 @@ public class RcloudCaller implements BaseCaller{
      */
 
     public CreateSecurityVO createFirewallTo(CreateSecuritySO createSecuritySO) throws Exception {
-          return CreateSecurityVO.builder()
-                .code(CommonUtil.FAIL_CODE)
-                .msg("Rcloud-不支持此功能")
-                .build();
+        Map<String, String> param = new TreeMap<>();
+        param.put("Action", "CreateFirewall");
+        param.put("PublicKey", pubKey);
+        param.put("Region", regionId);
+        if (StringUtils.isNotEmpty(projectId)) {
+            param.put("ProjectId", projectId);
+        }
+        param.put("Name", createSecuritySO.getName());
+
+        int ruleIndex = 0;
+        List<CreateSecuritySO.FirewallRule> rules = createSecuritySO.getRules();
+        if (rules != null && !rules.isEmpty()) {
+            // 新接口格式：按每条规则的协议/端口/源IP/描述生成
+            for (CreateSecuritySO.FirewallRule rule : rules) {
+                String protocol = StringUtils.isNotEmpty(rule.getProtocol()) ? rule.getProtocol().toUpperCase() : "TCP";
+                String port = rule.getPort();
+                validatePort(port);
+                String source = StringUtils.isNotEmpty(rule.getSource()) ? rule.getSource() : "0.0.0.0/0";
+                String remark = StringUtils.isNotEmpty(rule.getDescription()) ? rule.getDescription() : "开的" + protocol + port + "端口";
+                // UCloud规则格式：协议|端口|源IP|动作|优先级|备注
+                param.put("Rule." + ruleIndex++, protocol + "|" + port + "|" + source + "|ACCEPT|HIGH|" + remark);
+            }
+        } else {
+            // 旧格式：仅传port字符串，默认TCP+UDP双协议
+            String portStr = createSecuritySO.getPort();
+            validatePort(portStr);
+            List<String> dynamicPorts = parsePortString(portStr);
+            for (String port : dynamicPorts) {
+                param.put("Rule." + ruleIndex++, "TCP|" + port + "|0.0.0.0/0|ACCEPT|HIGH|开的TCP" + port + "端口");
+                param.put("Rule." + ruleIndex++, "UDP|" + port + "|0.0.0.0/0|ACCEPT|HIGH|开的UDP" + port + "端口");
+            }
+        }
+
+        String signature = getSignature(param, pivKey);
+        param.put("Signature", signature);
+        String str = HttpRequest.post(url, param);
+        JSONObject json = JSONObject.fromObject(str);
+
+        if (json.getInt("RetCode") == 0) {
+            return CreateSecurityVO.builder()
+                    .code(CommonUtil.SUCCESS_CODE)
+                    .msg(CommonUtil.SUCCESS_MSG)
+                    .fwId(json.getString("FWId"))
+                    .build();
+        } else {
+            log.info("Rcloud-创建防火墙{}失败：{}", createSecuritySO.getName(), str);
+            return null;
+        }
     }
+
+    /**
+     * 校验端口格式合法性（支持单个端口、多个端口、端口范围）
+     */
+    private void validatePort(String portStr) {
+        if (StringUtils.isEmpty(portStr)) {
+            throw new IllegalArgumentException("端口不能为空");
+        }
+
+        String[] portItems = portStr.split(",");
+        for (String item : portItems) {
+            item = item.trim();
+            if (item.isEmpty()) {
+                throw new IllegalArgumentException("端口格式错误，存在空项：" + portStr);
+            }
+
+            String[] rangeParts = item.split("-");
+            if (rangeParts.length > 2) {
+                throw new IllegalArgumentException("端口格式错误，范围只能包含起始和结束值：" + item);
+            }
+
+            try {
+                for (String part : rangeParts) {
+                    int port = Integer.parseInt(part.trim());
+                    if (port < 1 || port > 65535) {
+                        throw new IllegalArgumentException("端口必须在1-65535之间，当前值：" + port);
+                    }
+                }
+                if (rangeParts.length == 2) {
+                    int start = Integer.parseInt(rangeParts[0].trim());
+                    int end = Integer.parseInt(rangeParts[1].trim());
+                    if (start > end) {
+                        throw new IllegalArgumentException("端口范围起始值不能大于结束值：" + item);
+                    }
+                }
+            } catch (NumberFormatException e) {
+                throw new IllegalArgumentException("端口必须为数字或数字范围，当前值：" + item);
+            }
+        }
+    }
+
+    /**
+     * 解析端口字符串为端口列表（去重）
+     */
+    private List<String> parsePortString(String portStr) {
+        Set<String> portSet = new LinkedHashSet<>();
+        String[] portItems = portStr.split(",");
+        for (String item : portItems) {
+            portSet.add(item.trim());
+        }
+        return new ArrayList<>(portSet);
+    }
+
+    /**
+     * 查询主机绑定的安全组GroupId集合（DescribeSecurityGroup按ResourceId查）
+     */
+    private Set<String> queryBoundGroupIds(String resourceId) {
+        Set<String> groupIds = new HashSet<>();
+        try {
+            Map<String,String> param = new TreeMap<>();
+            param.put("Action","DescribeSecurityGroup");
+            param.put("PublicKey",pubKey);
+            param.put("Region",regionId);
+            if(StringUtils.isNotEmpty(projectId)){
+                param.put("ProjectId",projectId);
+            }
+            param.put("ResourceType","uhost");
+            param.put("ResourceId",resourceId);
+            String signature = getSignature(param,pivKey);
+            param.put("Signature",signature);
+            String str = HttpRequest.post(url,param);
+//            log.info("Rcloud-DescribeSecurityGroup响应：{}",str);
+            JSONObject json = JSONObject.fromObject(str);
+            if(json.getInt("RetCode") == 0){
+                JSONArray dataSet = json.optJSONArray("DataSet");
+                if(dataSet != null){
+                    for(int i = 0; i < dataSet.size(); i++){
+                        String groupId = dataSet.getJSONObject(i).optString("GroupId");
+                        if(StringUtils.isNotEmpty(groupId)){
+                            groupIds.add(groupId);
+                        }
+                    }
+                }
+            }
+        } catch (Exception e) {
+            log.info("Rcloud-查询主机绑定安全组异常：{}", e.getMessage());
+        }
+        return groupIds;
+    }
+
     /**
      * 查询防火墙
      * @param queryFirewallSO
@@ -741,7 +876,86 @@ public class RcloudCaller implements BaseCaller{
      */
     @Override
     public QueryFirewallVO queryFirewall(QueryFirewallSO queryFirewallSO) throws Exception {
+        String groupId = null;
+        String fwId = null;
+        String fwName = null;
+        List<FirewallRule> rules = new ArrayList<>();
+
+        Map<String,String> param = new TreeMap<>();
+        param.put("Action","DescribeFirewall");
+        param.put("PublicKey",pubKey);
+        param.put("Region",regionId);
+        if(StringUtils.isNotEmpty(projectId)){
+            param.put("ProjectId",projectId);
+        }
+        param.put("Limit","10000");
+        if(StringUtils.isNotEmpty(queryFirewallSO.getFwId())){
+            param.put("FWId",queryFirewallSO.getFwId());
+        }
+        String signature = getSignature(param,pivKey);
+        param.put("Signature",signature);
+
+        String str = HttpRequest.post(url,param);
+        JSONObject json = JSONObject.fromObject(str);
+
+        if(json.getInt("RetCode") == 0){
+            JSONArray dataArray = json.getJSONArray("DataSet");
+            // 按主机查询时：先调DescribeSecurityGroup拿该主机绑定的GroupId集合
+            Set<String> boundGroupIds = null;
+            if(StringUtils.isEmpty(queryFirewallSO.getFwId())
+                    && StringUtils.isEmpty(queryFirewallSO.getName())
+                    && StringUtils.isNotEmpty(queryFirewallSO.getInstanceId())){
+                boundGroupIds = queryBoundGroupIds(queryFirewallSO.getInstanceId());
+            }
+            for(int i = 0 ; i < dataArray.size() ; i++){
+                JSONObject data = dataArray.getJSONObject(i);
+                boolean isMatch = false;
+                if(StringUtils.isNotEmpty(queryFirewallSO.getFwId())){
+                    isMatch = queryFirewallSO.getFwId().equals(data.getString("FWId"));
+                }else if(StringUtils.isNotEmpty(queryFirewallSO.getName())){
+                    isMatch = queryFirewallSO.getName().equals(data.getString("Name"));
+                }else if(boundGroupIds != null){
+                    // 该主机绑定的安全组中包含此防火墙
+                    isMatch = boundGroupIds.contains(data.getString("GroupId"));
+                }
+                if (isMatch) {
+                    groupId = data.getString("GroupId");
+                    fwId = data.getString("FWId");
+                    fwName = data.getString("Name");
+
+                    JSONArray ruleArray = data.optJSONArray("Rule");
+                    if (ruleArray != null) {
+                        for (int j = 0; j < ruleArray.size(); j++) {
+                            JSONObject rule = ruleArray.getJSONObject(j);
+                            FirewallRule ruleInfo = new FirewallRule();
+                            ruleInfo.setProtocol(rule.optString("ProtocolType"));
+                            ruleInfo.setPort(rule.optString("DstPort"));
+                            ruleInfo.setAction(rule.optString("RuleAction"));
+                            ruleInfo.setPriority(rule.optString("Priority"));
+                            ruleInfo.setIpAddress(rule.optString("SrcIP"));
+                            ruleInfo.setRemark(rule.optString("Remark"));
+                            rules.add(ruleInfo);
+                        }
+                    }
+                    break;
+                }
+            }
+        }else{
+            log.info("Rcloud查防火墙失败：{}",str);
+        }
         return QueryFirewallVO.builder()
+                .groupId(groupId)
+                .fwId(fwId)
+                .name(fwName)
+                .rules(rules)
+                .code(CommonUtil.SUCCESS_CODE)
+                .msg("查询成功")
+                .build();
+    }
+
+    @Override
+    public CreateFirewallTemplateRulesVO createFirewallTemplateRules(CreateFirewallTemplateRulesSO so) {
+        return CreateFirewallTemplateRulesVO.builder()
                 .code(CommonUtil.FAIL_CODE)
                 .msg("Rcloud-不支持此功能")
                 .build();
@@ -755,9 +969,26 @@ public class RcloudCaller implements BaseCaller{
      */
     @Override
     public GrantFirewallVO grantFirewall(GrantFirewallSO grantFirewallSO) throws Exception {
+        Map<String,String> param = new TreeMap<>();
+        //param.put("Action","GrantFirewall");
+        param.put("Action","GrantSecurityGroup");
+        param.put("PublicKey",pubKey);
+        param.put("Region",regionId);
+        if(StringUtils.isNotEmpty(projectId)){
+            param.put("ProjectId",projectId);
+        }
+        param.put("GroupId",grantFirewallSO.getGroupId());
+        param.put("ResourceType","uhost");// Rcloud主机是CreateUHostInstance创建的，资源类型为uhost（UCLOUD轻量才是ulhost）
+        param.put("ResourceId",grantFirewallSO.getInstanceId());
+        param.put("ResourceId",grantFirewallSO.getInstanceId());
+        String signature = getSignature(param,pivKey);
+        param.put("Signature",signature);
+        String str = HttpRequest.post(url,param);
+        JSONObject json = JSONObject.fromObject(str);
         return GrantFirewallVO.builder()
-                .code(CommonUtil.FAIL_CODE)
-                .msg("Rcloud-不支持此功能")
+                .success(json.getInt("RetCode") == 0)
+                .code(json.getInt("RetCode") == 0 ? CommonUtil.SUCCESS_CODE : CommonUtil.FAIL_CODE)
+                .msg(json.getInt("RetCode") == 0 ? "绑定成功" : "绑定失败: " + str)
                 .build();
     }
 
@@ -848,6 +1079,14 @@ public class RcloudCaller implements BaseCaller{
      * @return
      */
     public DestroyVO destroy(DestroySO destroySO)throws Exception{
+        /** UCloud要求主机必须先关机(SHUTOFF)才能销毁，否则报8204，这里先检查并关机 **/
+        if(!waitUHostShutoff(destroySO.getInstanceId())){
+            log.info("Rcloud-云主机{} 销毁失败：主机未能关机",destroySO.getInstanceId());
+            return DestroyVO.builder()
+                    .code(CommonUtil.FAIL_CODE)
+                    .msg(CommonUtil.FAIL_MSG)
+                    .build();
+        }
         Map<String,String> param = new TreeMap<>();
         param.put("Action","TerminateUHostInstance");
         param.put("PublicKey",pubKey);
@@ -861,18 +1100,79 @@ public class RcloudCaller implements BaseCaller{
         String str = HttpRequest.post(url,param);
         JSONObject json = JSONObject.fromObject(str);
         if(json.getInt("RetCode") == 0){
+            log.info("Rcloud-云主机{} 销毁成功", destroySO.getInstanceId());
             return DestroyVO.builder()
                     .code(CommonUtil.SUCCESS_CODE)
                     .msg(CommonUtil.SUCCESS_MSG)
                     .build();
         }else{
-            log.info("Rcloud-云主机{} 销毁参数："+ JSONObject.fromObject(param).toString());
+            log.info("Rcloud-云主机{} 销毁参数：{}", destroySO.getInstanceId(), JSONObject.fromObject(param).toString());
             log.info("Rcloud-云主机{} 销毁失败：{}",destroySO.getInstanceId(),str);
             return DestroyVO.builder()
                     .code(CommonUtil.FAIL_CODE)
                     .msg(CommonUtil.FAIL_MSG)
                     .build();
         }
+    }
+
+    /**
+     * 确保云主机关机(SHUTOFF)，供销毁前调用
+     * 已关机直接返回true；否则发起关机并轮询等待，超时返回false
+     */
+    private boolean waitUHostShutoff(String instanceId)throws Exception{
+        String state = getUHostState(instanceId);
+        if("Stopped".equalsIgnoreCase(state)){
+            return true;
+        }
+        if(state == null){
+            return false;
+        }
+        /** 先关机 **/
+        StopVO stopVO = stop(StopSO.builder().instanceId(instanceId).build());
+        if(CommonUtil.FAIL_CODE == stopVO.getCode()){
+            log.info("Rcloud-云主机{} 销毁前关机失败",instanceId);
+            return false;
+        }
+        /** 轮询等待关机完成，最多等120秒 **/
+        for(int i = 0; i < 24; i++){
+            Thread.sleep(5000);
+            state = getUHostState(instanceId);
+            if("Stopped".equalsIgnoreCase(state)){
+                return true;
+            }
+            /** null说明主机已查询不到(可能已被销毁)，放行 **/
+            if(state == null){
+                return true;
+            }
+        }
+        log.info("Rcloud-云主机{} 等待关机超频，当前状态：{}",instanceId,state);
+        return false;
+    }
+
+    /**
+     * 查询单台云主机状态，查询不到返回null
+     */
+    private String getUHostState(String instanceId)throws Exception{
+        Map<String,String> param = new TreeMap<>();
+        param.put("Action","DescribeUHostInstance");
+        param.put("PublicKey",pubKey);
+        if(StringUtils.isNotEmpty(projectId)){
+            param.put("ProjectId",projectId);
+        }
+        param.put("Region",regionId);
+        param.put("UHostIds.0",instanceId);
+        String signature = getSignature(param,pivKey);
+        param.put("Signature",signature);
+        String str = HttpRequest.post(url,param);
+        JSONObject json = JSONObject.fromObject(str);
+        if(json.getInt("RetCode") != 0){
+            return null;
+        }
+        JSONArray instances = json.getJSONArray("UHostSet");
+        if(instances == null || instances.isEmpty()){
+            return null;
+        }
+        return JSONObject.fromObject(instances.get(0)).getString("State");
     }
 
     /**
@@ -1042,14 +1342,6 @@ public class RcloudCaller implements BaseCaller{
 
         }
 
-    }
-
-    @Override
-    public CreateFirewallTemplateRulesVO createFirewallTemplateRules(CreateFirewallTemplateRulesSO so) {
-        return CreateFirewallTemplateRulesVO.builder()
-                .code(CommonUtil.FAIL_CODE)
-                .msg("Rcloud-不支持此功能")
-                .build();
     }
 
 }

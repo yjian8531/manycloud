@@ -5,6 +5,9 @@ import lombok.Data;
 
 @Data
 @Builder
+/**
+ * 创建防火墙
+ */
 public class GrantFirewallSO {
     private String groupId;
     private String instanceId;
