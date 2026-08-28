@@ -503,6 +503,7 @@ public class UcloudCaller implements BaseCaller{
         JSONObject json = JSONObject.fromObject(str);
 
         if (json.getInt("RetCode") == 0) {
+            log.info("ucloud-创建防火墙{}成功：{}", createSecuritySO.getName(), json.getString("FWId"));
             return CreateSecurityVO.builder()
                     .code(CommonUtil.SUCCESS_CODE)
                     .msg(CommonUtil.SUCCESS_MSG)
@@ -574,10 +575,29 @@ public class UcloudCaller implements BaseCaller{
 
 
     /**
-     * 查询主机绑定的安全组GroupId集合（DescribeSecurityGroup按ResourceId查）
+     * 查询主机绑定的防火墙FWId集合（DescribeSecurityGroup按ResourceId查，取FWId字段，DisassociateFirewall需要FWId而非GroupId）。
+     * 只返回用户自建的（Type为recommend的是UCloud官方模板，不动）
      */
     private Set<String> queryBoundGroupIds(String resourceId) {
+        Map<String,String> fwIdTypeMap = queryBoundFirewalls(resourceId);
         Set<String> groupIds = new HashSet<>();
+        for(Map.Entry<String,String> entry : fwIdTypeMap.entrySet()){
+            String type = entry.getValue();
+            // Type=0用户自建（可解绑）；Type=1等非0是官方推荐模板，不解绑（2026-08-28实测：183201官方Type=1，201885自建Type=0）
+            if(!"0".equals(type)){
+                log.info("ucloud-主机{}绑定的防火墙{}为官方模板(Type={})，跳过不解绑", resourceId, entry.getKey(), type);
+                continue;
+            }
+            groupIds.add(entry.getKey());
+        }
+        return groupIds;
+    }
+
+    /**
+     * 查询主机绑定的防火墙及类型（FWId -> Type），DescribeSecurityGroup按ResourceId查
+     */
+    private Map<String,String> queryBoundFirewalls(String resourceId) {
+        Map<String,String> fwIdTypeMap = new HashMap<>();
         try {
             Map<String,String> param = new TreeMap<>();
             param.put("Action","DescribeSecurityGroup");
@@ -597,17 +617,22 @@ public class UcloudCaller implements BaseCaller{
                 JSONArray dataSet = json.optJSONArray("DataSet");
                 if(dataSet != null){
                     for(int i = 0; i < dataSet.size(); i++){
-                        String gId = dataSet.getJSONObject(i).optString("GroupId");
+                        JSONObject data = dataSet.getJSONObject(i);
+                        String gId = data.optString("FWId");
+                        if(StringUtils.isEmpty(gId)){
+                            gId = data.optString("FirewallId");
+                        }
                         if(StringUtils.isNotEmpty(gId)){
-                            groupIds.add(gId);
+                            // DescribeSecurityGroup返回的Type可能是数字（0/1等），DescribeFirewall返回字符串（user defined/recommend web），统一转字符串处理
+                            fwIdTypeMap.put(gId, data.opt("Type") == null ? null : String.valueOf(data.opt("Type")));
                         }
                     }
                 }
             }
         } catch (Exception e) {
-            log.info("Ucloud-查询主机绑定安全组异常：{}", e.getMessage());
+            log.info("Ucloud-查询主机绑定防火墙异常：{}", e.getMessage());
         }
-        return groupIds;
+        return fwIdTypeMap;
     }
 
     /**
@@ -657,7 +682,7 @@ public class UcloudCaller implements BaseCaller{
                 }else if(StringUtils.isNotEmpty(queryFirewallSO.getName())){
                     isMatch = queryFirewallSO.getName().equals(data.getString("Name"));
                 }else if(boundGroupIds != null){
-                    // 该主机绑定的安全组中包含此防火墙
+                    // 该主机绑定的防火墙中包含此条
                     isMatch = boundGroupIds.contains(data.getString("GroupId"));
                 }
                 if (isMatch) {
@@ -775,11 +800,195 @@ public class UcloudCaller implements BaseCaller{
         String str = HttpRequest.post(url,param);
         //log.info("响应结果："+str);
         JSONObject json = JSONObject.fromObject(str);
+        if(json.getInt("RetCode") == 0){
+            log.info("ucloud-主机{}绑定防火墙{}成功", grantFirewallSO.getInstanceId(), grantFirewallSO.getGroupId());
+        }else{
+            log.info("ucloud-主机{}绑定防火墙{}失败：{}", grantFirewallSO.getInstanceId(), grantFirewallSO.getGroupId(), str);
+        }
         return GrantFirewallVO.builder()
                 .success(json.getInt("RetCode") == 0)
                 .code(json.getInt("RetCode") == 0 ? CommonUtil.SUCCESS_CODE : CommonUtil.FAIL_CODE)
                 .msg(json.getInt("RetCode") == 0 ? "绑定成功" : "绑定失败: " + str)
                 .build();
+    }
+
+    /**
+     * 更新防火墙规则（UCloud的UpdateFirewall为全量覆盖，需传入旧规则+新规则）
+     * @param updateFirewallSO
+     * @return
+     * @throws Exception
+     */
+    @Override
+    public UpdateFirewallVO updateFirewall(UpdateFirewallSO updateFirewallSO) throws Exception {
+        Map<String,String> param = new TreeMap<>();
+        param.put("Action","UpdateFirewall");
+        param.put("PublicKey",pubKey);
+        param.put("Region",regionId);
+        if(StringUtils.isNotEmpty(projectId)){
+            param.put("ProjectId",projectId);
+        }
+        param.put("FWId",updateFirewallSO.getFwId());
+        List<String> rules = updateFirewallSO.getRules();
+        if(rules != null){
+            for(int i = 0; i < rules.size(); i++){
+                param.put("Rule."+i, rules.get(i));
+            }
+        }
+        String signature = getSignature(param,pivKey);
+        param.put("Signature",signature);
+        String str = HttpRequest.post(url,param);
+        JSONObject json = JSONObject.fromObject(str);
+        if(json.getInt("RetCode") == 0){
+            log.info("ucloud-更新防火墙{}成功", updateFirewallSO.getFwId());
+            return UpdateFirewallVO.builder()
+                    .code(CommonUtil.SUCCESS_CODE)
+                    .msg(CommonUtil.SUCCESS_MSG)
+                    .build();
+        }else{
+            log.info("ucloud-更新防火墙{}失败：{}",updateFirewallSO.getFwId(),str);
+            return UpdateFirewallVO.builder()
+                    .code(CommonUtil.FAIL_CODE)
+                    .msg(CommonUtil.FAIL_MSG)
+                    .build();
+        }
+    }
+
+    /**
+     * 解绑主机的所有防火墙并清理无主防火墙：
+     * 1.按ResourceId查该主机绑定的GroupId集合
+     * 2.逐个解绑（DeleteSecurityGroup）
+     * 3.解绑后查防火墙ResourceCount，为0说明没有其他主机在用，删除防火墙；否则保留
+     * @param serviceNo 云平台实例ID
+     * @return
+     * @throws Exception
+     */
+    @Override
+    public RevokeFirewallVO unbindAndCleanFirewalls(String serviceNo) throws Exception {
+        Set<String> boundGroupIds = queryBoundGroupIds(serviceNo);
+        if(boundGroupIds == null || boundGroupIds.isEmpty()){
+            return RevokeFirewallVO.builder()
+                    .code(CommonUtil.SUCCESS_CODE)
+                    .msg("主机无绑定的防火墙")
+                    .build();
+        }
+        for(String groupId : boundGroupIds){
+            /** 解绑：DisassociateFirewall与GrantFirewall/GrantSecurityGroup配对**/
+            Map<String,String> param = new TreeMap<>();
+            param.put("Action","DisassociateFirewall");
+            param.put("PublicKey",pubKey);
+            param.put("Region",regionId);
+            if(StringUtils.isNotEmpty(projectId)){
+                param.put("ProjectId",projectId);
+            }
+            param.put("FWId",groupId);// DisassociateFirewall需要FWId（firewall-xxx），传GroupId会报220 Missing params [FWId]
+            param.put("ResourceType","ulhost");
+            param.put("ResourceId",serviceNo);
+            String signature = getSignature(param,pivKey);
+            param.put("Signature",signature);
+            String str = HttpRequest.post(url,param);
+            JSONObject json = JSONObject.fromObject(str);
+            if(json.getInt("RetCode") == 0){
+                log.info("ucloud-主机{}解绑防火墙{}成功", serviceNo, groupId);
+            }else{
+                log.info("ucloud-主机{}解绑防火墙{}失败：{}", serviceNo, groupId, str);
+            }
+        }
+        /** 解绑后只检查刚解绑的这些防火墙：无其他主机在用(ResourceCount=0)的删除，否则保留 **/
+        cleanIdleFirewalls(boundGroupIds);
+        return RevokeFirewallVO.builder()
+                .code(CommonUtil.SUCCESS_CODE)
+                .msg("解绑完成")
+                .build();
+    }
+
+    /**
+     * 清理刚解绑的防火墙：按FWId精确查询本次解绑过的（FWId.N参数，不拉全量列表），
+     * 无其他主机在用(ResourceCount=0)的删除；仍有主机在用的保留并打日志给运维；其他防火墙一律不碰
+     */
+    private void cleanIdleFirewalls(Set<String> targetFwIds){
+        if(targetFwIds == null || targetFwIds.isEmpty()){
+            return;
+        }
+        try{
+            Map<String,String> param = new TreeMap<>();
+            param.put("Action","DescribeFirewall");
+            param.put("PublicKey",pubKey);
+            param.put("Region",regionId);
+            if(StringUtils.isNotEmpty(projectId)){
+                param.put("ProjectId",projectId);
+            }
+            // 按FWId精确查询：只查本次解绑过的几条，不拉整个账号的防火墙列表
+            int idx = 0;
+            for(String fwId : targetFwIds){
+                param.put("FWId."+idx++, fwId);
+            }
+            String signature = getSignature(param,pivKey);
+            param.put("Signature",signature);
+            String str = HttpRequest.post(url,param);
+            JSONObject json = JSONObject.fromObject(str);
+            if(json.getInt("RetCode") != 0){
+                log.info("ucloud-查询防火墙详情失败：{}",str);
+                return;
+            }
+            JSONArray dataArray = json.optJSONArray("DataSet");
+            if(dataArray == null){
+                return;
+            }
+            for(int i = 0; i < dataArray.size(); i++){
+                JSONObject data = dataArray.getJSONObject(i);
+                String fwId = data.getString("FWId");
+                // 客户端再过滤一次：万一平台忽略FWId.N参数返回全量列表，也只处理本次解绑过的，绝不动其他防火墙
+                if(!targetFwIds.contains(fwId)){
+                    continue;
+                }
+                int resourceCount = data.optInt("ResourceCount", -1);
+                if(resourceCount == 0){
+                    DeleteFirewallVO delVO = deleteFirewall(DeleteFirewallSO.builder().fwId(fwId).build());
+                    if(delVO != null && CommonUtil.SUCCESS_CODE.equals(delVO.getCode())){
+                        log.info("ucloud-清理无绑定防火墙{}成功", fwId);
+                    }
+                }else{
+                    log.info("ucloud-防火墙{}仍有{}台主机在使用，已保留不删除", fwId, resourceCount);
+                }
+            }
+        }catch (Exception e){
+            log.info("ucloud-清理无绑定防火墙异常：{}", e.getMessage());
+        }
+    }
+
+    /**
+     * 删除防火墙
+     * @param deleteFirewallSO
+     * @return
+     * @throws Exception
+     */
+    @Override
+    public DeleteFirewallVO deleteFirewall(DeleteFirewallSO deleteFirewallSO) throws Exception {
+        Map<String,String> param = new TreeMap<>();
+        param.put("Action","DeleteFirewall");
+        param.put("PublicKey",pubKey);
+        param.put("Region",regionId);
+        if(StringUtils.isNotEmpty(projectId)){
+            param.put("ProjectId",projectId);
+        }
+        param.put("FWId",deleteFirewallSO.getFwId());
+        String signature = getSignature(param,pivKey);
+        param.put("Signature",signature);
+        String str = HttpRequest.post(url,param);
+        JSONObject json = JSONObject.fromObject(str);
+        if(json.getInt("RetCode") == 0){
+            log.info("ucloud-删除防火墙{}成功", deleteFirewallSO.getFwId());
+            return DeleteFirewallVO.builder()
+                    .code(CommonUtil.SUCCESS_CODE)
+                    .msg(CommonUtil.SUCCESS_MSG)
+                    .build();
+        }else{
+            log.info("ucloud-删除防火墙{}失败：{}",deleteFirewallSO.getFwId(),str);
+            return DeleteFirewallVO.builder()
+                    .code(CommonUtil.FAIL_CODE)
+                    .msg(CommonUtil.FAIL_MSG)
+                    .build();
+        }
     }
 
     /**
@@ -1064,6 +1273,13 @@ public class UcloudCaller implements BaseCaller{
                     .code(CommonUtil.FAIL_CODE)
                     .msg(CommonUtil.FAIL_MSG)
                     .build();
+        }
+        /** 关机后、销毁前解绑防火墙并清理无主防火墙：
+         * 运行中解绑会报4361(security group is in use)；销毁后绑定关系随主机消失查不到，所以必须在关机后解绑 **/
+        try{
+            unbindAndCleanFirewalls(destroySO.getInstanceId());
+        }catch (Exception e){
+            log.info("ucloud-主机{}销毁前防火墙解绑异常（不阻塞销毁）：{}",destroySO.getInstanceId(),e.getMessage());
         }
         Map<String,String> param = new TreeMap<>();
         param.put("Action","TerminateULHostInstance");

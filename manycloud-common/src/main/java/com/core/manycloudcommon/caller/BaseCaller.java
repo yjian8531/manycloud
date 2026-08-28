@@ -179,6 +179,31 @@ public interface BaseCaller {
      */
     public GrantFirewallVO grantFirewall(GrantFirewallSO grantFirewallSO) throws Exception;
 
+    /**
+     * 更新防火墙规则（全量覆盖）
+     * @param updateFirewallSO
+     * @return
+     * @throws Exception
+     */
+    public UpdateFirewallVO updateFirewall(UpdateFirewallSO updateFirewallSO) throws Exception;
+
+    /**
+     * 删除防火墙
+     * @param deleteFirewallSO
+     * @return
+     * @throws Exception
+     */
+    public DeleteFirewallVO deleteFirewall(DeleteFirewallSO deleteFirewallSO) throws Exception;
+
+    /**
+     * 解绑主机的所有安全组并清理无主防火墙：
+     * 解绑该主机绑定的所有安全组，解绑后若防火墙无其他资源绑定(ResourceCount=0)则删除防火墙，否则保留
+     * @param serviceNo 云平台实例ID
+     * @return
+     * @throws Exception
+     */
+    public RevokeFirewallVO unbindAndCleanFirewalls(String serviceNo) throws Exception;
+
 
     /**
      * 查询集群列表(Iplight)

@@ -7,7 +7,7 @@ import com.core.manycloudcommon.model.AccountApi;
 import com.core.manycloudcommon.utils.CommonUtil;
 import com.core.manycloudcommon.utils.HttpRequest;
 import com.core.manycloudcommon.utils.StringUtils;
-import lombok.extern.slf4j.Slf4j;
+import lombok.extern.slf4j .Slf4j;
 import net.sf.json.JSONArray;
 import net.sf.json.JSONObject;
 
@@ -124,7 +124,7 @@ public class AkamaiCaller implements BaseCaller{
         if(json.get("errors") != null){
             log.info("阿卡麦-查询实例参数:{}",instanceId);
             log.info("阿卡麦-查询实例结果:{}",result);
-            return QueryVO.builder()
+            return QueryVO .builder()
                     .code(CommonUtil.FAIL_CODE)
                     .msg(result)
                     .build();
@@ -647,4 +647,45 @@ public class AkamaiCaller implements BaseCaller{
     }
 
 
+    /**
+     * 更新防火墙规则
+     * @param updateFirewallSO
+     * @return
+     * @throws Exception
+     */
+    @Override
+    public UpdateFirewallVO updateFirewall(UpdateFirewallSO updateFirewallSO) throws Exception {
+        return UpdateFirewallVO.builder()
+                .code(CommonUtil.FAIL_CODE)
+                .msg("Akamai-不支持此功能")
+                .build();
+    }
+
+    /**
+     * 删除防火墙
+     * @param deleteFirewallSO
+     * @return
+     * @throws Exception
+     */
+    @Override
+    public DeleteFirewallVO deleteFirewall(DeleteFirewallSO deleteFirewallSO) throws Exception {
+        return DeleteFirewallVO.builder()
+                .code(CommonUtil.FAIL_CODE)
+                .msg("Akamai-不支持此功能")
+                .build();
+    }
+
+    /**
+     * 解绑主机的所有安全组并清理无主防火墙
+     * @param serviceNo
+     * @return
+     * @throws Exception
+     */
+    @Override
+    public RevokeFirewallVO unbindAndCleanFirewalls(String serviceNo) throws Exception {
+        return RevokeFirewallVO.builder()
+                .code(CommonUtil.FAIL_CODE)
+                .msg("Akamai-不支持此功能")
+                .build();
+    }
 }

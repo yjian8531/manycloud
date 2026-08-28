@@ -468,40 +468,75 @@ public class OpenInstanceServiceImpl implements OpenInstanceService {
         if(info == null){
             return new ResultMessage(ResultMessage.FAILED_CODE, "主机不存在或无权访问");
         }
+        // 端口必填（用于拼防火墙名）
+        List<String> ports = parsePorts(createSecuritySO);
+        if(ports.isEmpty()){
+            return new ResultMessage(ResultMessage.FAILED_CODE, "缺少必要参数：port");
+        }
         try{
             BaseCaller caller = buildCaller(info);
-            // 将系统内部ID替换为真实的云平台实例ID（serviceNo）
-            createSecuritySO.setInstanceId(info.getServiceNo());
-            CreateSecurityVO vo = caller.createFirewallTo(createSecuritySO);
-            if(vo != null && CommonUtil.SUCCESS_CODE.equals(vo.getCode())){
-                Map<String, Object> data = new HashMap<>();
-                data.put("fwId", vo.getFwId());
 
-                // 查询GroupId并绑定到实例（参考 InstanceServiceImpl.createFirewall）
-                QueryFirewallSO queryFirewallSO = QueryFirewallSO.builder()
+            /** 防火墙名称直接用上游传入的name，本地不拼装 **/
+            String fwName = createSecuritySO.getName();
+            if(StringUtils.isEmpty(fwName)){
+                return new ResultMessage(ResultMessage.FAILED_CODE, "缺少必要参数：name");
+            }
+
+            /** 参考liebao：先按名字查云端是否已有同名防火墙，有则直接绑定复用，没有才创建 **/
+            QueryFirewallVO existFw = caller.queryFirewall(QueryFirewallSO.builder()
+                    .name(fwName)
+                    .build());
+
+            Map<String, Object> data = new HashMap<>();
+            String fwId;
+            String groupId;
+            /** 是否复用了已存在的同名防火墙 **/
+            boolean existed = false;
+
+            if(existFw != null && StringUtils.isNotEmpty(existFw.getFwId())){
+                /** 同名防火墙已存在：直接拿来绑定当前主机（一套规则多机共用） **/
+                fwId = existFw.getFwId();
+                groupId = existFw.getGroupId();
+                existed = true;
+                log.info("安全组{}已存在，直接绑定主机{}", fwId, info.getInstanceId());
+            }else{
+                /** 不存在：创建新防火墙 **/
+                CreateSecurityVO vo = caller.createFirewallTo(createSecuritySO);
+                if(vo == null || !CommonUtil.SUCCESS_CODE.equals(vo.getCode())){
+                    return new ResultMessage(ResultMessage.FAILED_CODE, "安全组规则创建失败");
+                }
+                fwId = vo.getFwId();
+                data.put("fwId", fwId);
+
+                QueryFirewallVO queryFirewallVO = caller.queryFirewall(QueryFirewallSO.builder()
                         .name(createSecuritySO.getName())
-                        .fwId(vo.getFwId())
-                        .build();
-                QueryFirewallVO queryFirewallVO = caller.queryFirewall(queryFirewallSO);
-                if(queryFirewallVO != null && StringUtils.isNotEmpty(queryFirewallVO.getGroupId())){
-                    data.put("groupId", queryFirewallVO.getGroupId());
-                    GrantFirewallSO grantFirewallSO = GrantFirewallSO.builder()
-                            .groupId(queryFirewallVO.getGroupId())
-                            .instanceId(info.getServiceNo())
-                            .build();
-                    GrantFirewallVO bindResult = caller.grantFirewall(grantFirewallSO);
-                    if(bindResult == null || !bindResult.isSuccess()){
-                        String errMsg = bindResult == null ? "无响应" : bindResult.getMsg();
-                        log.info("[开放接口]Rcloud安全组绑定失败：{}", errMsg);
-                        return new ResultMessage(ResultMessage.FAILED_CODE, "安全组创建成功但绑定失败：" + errMsg, data);
-                    }
-                }else{
+                        .fwId(fwId)
+                        .build());
+                if(queryFirewallVO == null || StringUtils.isEmpty(queryFirewallVO.getGroupId())){
                     return new ResultMessage(ResultMessage.FAILED_CODE, "安全组创建成功但查询GroupId失败", data);
                 }
-
-                return new ResultMessage(ResultMessage.SUCCEED_CODE, "安全组创建并绑定成功", data);
+                groupId = queryFirewallVO.getGroupId();
             }
-            return new ResultMessage(ResultMessage.FAILED_CODE, "安全组规则创建失败");
+
+            data.put("fwId", fwId);
+            data.put("groupId", groupId);
+            data.put("existed", existed);
+
+            /** 绑定到当前主机 **/
+            GrantFirewallVO bindResult = caller.grantFirewall(GrantFirewallSO.builder()
+                    .groupId(groupId)
+                    .instanceId(info.getServiceNo())
+                    .build());
+            if(bindResult == null || !bindResult.isSuccess()){
+                String errMsg = bindResult == null ? "无响应" : bindResult.getMsg();
+                log.info("[开放接口]安全组绑定失败：{}", errMsg);
+                return new ResultMessage(ResultMessage.FAILED_CODE, "安全组绑定失败：" + errMsg, data);
+            }
+
+            if(existed){
+                return new ResultMessage(ResultMessage.SUCCEED_CODE, "安全组已存在，已直接绑定到该主机（规则保持原有不变）", data);
+            }
+            return new ResultMessage(ResultMessage.SUCCEED_CODE, "安全组创建成功，已绑定到该主机", data);
         }catch (Exception e){
             log.info("[开放接口]创建安全组[{}]异常：{}", createSecuritySO.getInstanceId(), e.getMessage());
             return new ResultMessage(ResultMessage.FAILED_CODE, "安全组规则创建异常");
@@ -543,6 +578,26 @@ public class OpenInstanceServiceImpl implements OpenInstanceService {
 
 
     // ============================== 工具 ==============================
+
+    /** 解析要开放的端口列表：优先rules数组里的port，其次port字符串 */
+    private List<String> parsePorts(CreateSecuritySO createSecuritySO){
+        List<String> ports = new ArrayList<>();
+        List<CreateSecuritySO.FirewallRule> rules = createSecuritySO.getRules();
+        if(rules != null && !rules.isEmpty()){
+            for(CreateSecuritySO.FirewallRule rule : rules){
+                if(StringUtils.isNotEmpty(rule.getPort())){
+                    ports.add(rule.getPort().trim());
+                }
+            }
+        }else if(StringUtils.isNotEmpty(createSecuritySO.getPort())){
+            for(String p : createSecuritySO.getPort().split(",")){
+                if(StringUtils.isNotEmpty(p.trim())){
+                    ports.add(p.trim());
+                }
+            }
+        }
+        return ports;
+    }
 
     /** 校验主机归属：存在且属于该特殊用户才返回，否则 null */
     private InstanceInfo checkOwnership(String userId, String instanceId){

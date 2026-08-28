@@ -568,4 +568,45 @@ public class DigitalOceanCaller implements BaseCaller{
                 .build();
     }
 
+    /**
+     * 更新防火墙规则
+     * @param updateFirewallSO
+     * @return
+     * @throws Exception
+     */
+    @Override
+    public UpdateFirewallVO updateFirewall(UpdateFirewallSO updateFirewallSO) throws Exception {
+        return UpdateFirewallVO.builder()
+                .code(CommonUtil.FAIL_CODE)
+                .msg("DigitalOcean-不支持此功能")
+                .build();
+    }
+
+    /**
+     * 删除防火墙
+     * @param deleteFirewallSO
+     * @return
+     * @throws Exception
+     */
+    @Override
+    public DeleteFirewallVO deleteFirewall(DeleteFirewallSO deleteFirewallSO) throws Exception {
+        return DeleteFirewallVO.builder()
+                .code(CommonUtil.FAIL_CODE)
+                .msg("DigitalOcean-不支持此功能")
+                .build();
+    }
+
+    /**
+     * 解绑主机的所有安全组并清理无主防火墙
+     * @param serviceNo
+     * @return
+     * @throws Exception
+     */
+    @Override
+    public RevokeFirewallVO unbindAndCleanFirewalls(String serviceNo) throws Exception {
+        return RevokeFirewallVO.builder()
+                .code(CommonUtil.FAIL_CODE)
+                .msg("DigitalOcean-不支持此功能")
+                .build();
+    }
 }

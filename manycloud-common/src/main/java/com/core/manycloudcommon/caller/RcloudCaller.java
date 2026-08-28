@@ -502,7 +502,7 @@ public class RcloudCaller implements BaseCaller{
     }
 
     /**
-     * 关联防火墙安全组信息
+     * 关联防火墙信息
      * @param groupId 防火墙ID(安全组ID)
      * @param instanceId 主机ID
      * @return
@@ -529,7 +529,7 @@ public class RcloudCaller implements BaseCaller{
         if(json.getInt("RetCode") == 0){
             return true;
         }else{
-            log.info("ucloud-关联防火墙安全组信息："+str);
+            log.info("ucloud-关联防火墙信息："+str);
             return false;
         }
     }
@@ -768,6 +768,7 @@ public class RcloudCaller implements BaseCaller{
         JSONObject json = JSONObject.fromObject(str);
 
         if (json.getInt("RetCode") == 0) {
+            log.info("Rcloud-创建防火墙{}成功：{}", createSecuritySO.getName(), json.getString("FWId"));
             return CreateSecurityVO.builder()
                     .code(CommonUtil.SUCCESS_CODE)
                     .msg(CommonUtil.SUCCESS_MSG)
@@ -832,10 +833,32 @@ public class RcloudCaller implements BaseCaller{
     }
 
     /**
-     * 查询主机绑定的安全组GroupId集合（DescribeSecurityGroup按ResourceId查）
+     * 查询主机绑定的防火墙FWId集合（DescribeSecurityGroup按ResourceId查，取FWId字段，DisassociateFirewall需要FWId而非GroupId）。
+     * 只返回用户自建的（Type非0的是平台官方模板，不动）
      */
     private Set<String> queryBoundGroupIds(String resourceId) {
+        Map<String,String> fwIdTypeMap = queryBoundFirewalls(resourceId);
         Set<String> groupIds = new HashSet<>();
+        for(Map.Entry<String,String> entry : fwIdTypeMap.entrySet()){
+            String type = entry.getValue();
+            // Type=0用户自建（可解绑）；Type=1等非0是官方推荐模板，不解绑（UCloud实测：官方Type=1，自建Type=0）
+            if(!"0".equals(type)){
+                log.info("Rcloud-主机{}绑定的防火墙{}为官方模板(Type={})，跳过不解绑", resourceId, entry.getKey(), type);
+                continue;
+            }
+            groupIds.add(entry.getKey());
+        }
+        return groupIds;
+    }
+
+    /**
+     * 查询主机绑定的防火墙及类型（FWId -> Type），DescribeSecurityGroup按ResourceId查
+     * 同时维护FWId->GroupId映射（清理环节按GroupId精确查询用，Rcloud的DescribeFirewall不支持FWId.N批量查询）
+     */
+    private Map<String,String> fwIdGroupIdMap = new HashMap<>();
+
+    private Map<String,String> queryBoundFirewalls(String resourceId) {
+        Map<String,String> fwIdTypeMap = new HashMap<>();
         try {
             Map<String,String> param = new TreeMap<>();
             param.put("Action","DescribeSecurityGroup");
@@ -855,17 +878,26 @@ public class RcloudCaller implements BaseCaller{
                 JSONArray dataSet = json.optJSONArray("DataSet");
                 if(dataSet != null){
                     for(int i = 0; i < dataSet.size(); i++){
-                        String groupId = dataSet.getJSONObject(i).optString("GroupId");
-                        if(StringUtils.isNotEmpty(groupId)){
-                            groupIds.add(groupId);
+                        JSONObject data = dataSet.getJSONObject(i);
+                        String fwId = data.optString("FWId");
+                        if(StringUtils.isEmpty(fwId)){
+                            fwId = data.optString("FirewallId");
+                        }
+                        if(StringUtils.isNotEmpty(fwId)){
+                            // DescribeSecurityGroup返回的Type是数字（0=用户自建，1=官方推荐），统一转字符串处理
+                            fwIdTypeMap.put(fwId, data.opt("Type") == null ? null : String.valueOf(data.opt("Type")));
+                            String gid = data.optString("GroupId");
+                            if(StringUtils.isNotEmpty(gid)){
+                                fwIdGroupIdMap.put(fwId, gid);
+                            }
                         }
                     }
                 }
             }
         } catch (Exception e) {
-            log.info("Rcloud-查询主机绑定安全组异常：{}", e.getMessage());
+            log.info("Rcloud-查询主机绑定防火墙异常：{}", e.getMessage());
         }
-        return groupIds;
+        return fwIdTypeMap;
     }
 
     /**
@@ -915,7 +947,7 @@ public class RcloudCaller implements BaseCaller{
                 }else if(StringUtils.isNotEmpty(queryFirewallSO.getName())){
                     isMatch = queryFirewallSO.getName().equals(data.getString("Name"));
                 }else if(boundGroupIds != null){
-                    // 该主机绑定的安全组中包含此防火墙
+                    // 该主机绑定的防火墙中包含此条
                     isMatch = boundGroupIds.contains(data.getString("GroupId"));
                 }
                 if (isMatch) {
@@ -985,11 +1017,192 @@ public class RcloudCaller implements BaseCaller{
         param.put("Signature",signature);
         String str = HttpRequest.post(url,param);
         JSONObject json = JSONObject.fromObject(str);
+        if(json.getInt("RetCode") == 0){
+            log.info("Rcloud-主机{}绑定防火墙{}成功", grantFirewallSO.getInstanceId(), grantFirewallSO.getGroupId());
+        }else{
+            log.info("Rcloud-主机{}绑定防火墙{}失败：{}", grantFirewallSO.getInstanceId(), grantFirewallSO.getGroupId(), str);
+        }
         return GrantFirewallVO.builder()
                 .success(json.getInt("RetCode") == 0)
                 .code(json.getInt("RetCode") == 0 ? CommonUtil.SUCCESS_CODE : CommonUtil.FAIL_CODE)
                 .msg(json.getInt("RetCode") == 0 ? "绑定成功" : "绑定失败: " + str)
                 .build();
+    }
+
+    /**
+     * 更新防火墙规则（UCloud的UpdateFirewall为全量覆盖，需传入旧规则+新规则）
+     * @param updateFirewallSO
+     * @return
+     * @throws Exception
+     */
+    @Override
+    public UpdateFirewallVO updateFirewall(UpdateFirewallSO updateFirewallSO) throws Exception {
+        Map<String,String> param = new TreeMap<>();
+        param.put("Action","UpdateFirewall");
+        param.put("PublicKey",pubKey);
+        param.put("Region",regionId);
+        if(StringUtils.isNotEmpty(projectId)){
+            param.put("ProjectId",projectId);
+        }
+        param.put("FWId",updateFirewallSO.getFwId());
+        List<String> rules = updateFirewallSO.getRules();
+        if(rules != null){
+            for(int i = 0; i < rules.size(); i++){
+                param.put("Rule."+i, rules.get(i));
+            }
+        }
+        String signature = getSignature(param,pivKey);
+        param.put("Signature",signature);
+        String str = HttpRequest.post(url,param);
+        JSONObject json = JSONObject.fromObject(str);
+        if(json.getInt("RetCode") == 0){
+            log.info("Rcloud-更新防火墙{}成功", updateFirewallSO.getFwId());
+            return UpdateFirewallVO.builder()
+                    .code(CommonUtil.SUCCESS_CODE)
+                    .msg(CommonUtil.SUCCESS_MSG)
+                    .build();
+        }else{
+            log.info("Rcloud-更新防火墙{}失败：{}",updateFirewallSO.getFwId(),str);
+            return UpdateFirewallVO.builder()
+                    .code(CommonUtil.FAIL_CODE)
+                    .msg(CommonUtil.FAIL_MSG)
+                    .build();
+        }
+    }
+
+    /**
+     * 解绑主机的所有防火墙并清理无主防火墙：
+     * 1.按ResourceId查该主机绑定的GroupId集合
+     * 2.逐个解绑（DeleteSecurityGroup）
+     * 3.解绑后查防火墙ResourceCount，为0说明没有其他主机在用，删除防火墙；否则保留
+     * @param serviceNo 云平台实例ID
+     * @return
+     * @throws Exception
+     */
+    @Override
+    public RevokeFirewallVO unbindAndCleanFirewalls(String serviceNo) throws Exception {
+        Set<String> boundGroupIds = queryBoundGroupIds(serviceNo);
+        if(boundGroupIds == null || boundGroupIds.isEmpty()){
+            return RevokeFirewallVO.builder()
+                    .code(CommonUtil.SUCCESS_CODE)
+                    .msg("主机无绑定的防火墙")
+                    .build();
+        }
+        for(String groupId : boundGroupIds){
+            /** 解绑：DisassociateFirewall与GrantFirewall配对（LeaveSecurityGroup在部分平台不存在报161；DeleteSecurityGroup是删除安全组本体，挂资源时报4361） **/
+            Map<String,String> param = new TreeMap<>();
+            param.put("Action","DisassociateFirewall");
+            param.put("PublicKey",pubKey);
+            param.put("Region",regionId);
+            if(StringUtils.isNotEmpty(projectId)){
+                param.put("ProjectId",projectId);
+            }
+            param.put("FWId",groupId);// DisassociateFirewall需要FWId（firewall-xxx），传GroupId会报220 Missing params [FWId]
+            param.put("ResourceType","uhost");
+            param.put("ResourceId",serviceNo);
+            String signature = getSignature(param,pivKey);
+            param.put("Signature",signature);
+            String str = HttpRequest.post(url,param);
+            JSONObject json = JSONObject.fromObject(str);
+            if(json.getInt("RetCode") == 0){
+                log.info("Rcloud-主机{}解绑防火墙{}成功", serviceNo, groupId);
+            }else{
+                log.info("Rcloud-主机{}解绑防火墙{}失败：{}", serviceNo, groupId, str);
+            }
+        }
+        /** 解绑后只检查刚解绑的这些防火墙：无其他主机在用(ResourceCount=0)的删除，否则保留 **/
+        cleanIdleFirewalls(boundGroupIds);
+        return RevokeFirewallVO.builder()
+                .code(CommonUtil.SUCCESS_CODE)
+                .msg("解绑完成")
+                .build();
+    }
+
+    /**
+     * 清理刚解绑的防火墙：逐条按GroupId精确查询（Rcloud的DescribeFirewall不支持FWId.N批量查询，会忽略参数返回全量），
+     * 无其他主机在用(ResourceCount=0)的删除；仍有主机在用的保留并打日志给运维；其他防火墙一律不碰
+     */
+    private void cleanIdleFirewalls(Set<String> targetFwIds){
+        if(targetFwIds == null || targetFwIds.isEmpty()){
+            return;
+        }
+        for(String fwId : targetFwIds){
+            try{
+                String groupId = fwIdGroupIdMap.get(fwId);
+                if(StringUtils.isEmpty(groupId)){
+                    // 查不到GroupId就没法精确查询，跳过（宁可不删，不拉全量误判）
+                    log.info("Rcloud-防火墙{}无GroupId映射，跳过清理", fwId);
+                    continue;
+                }
+                Map<String,String> param = new TreeMap<>();
+                param.put("Action","DescribeFirewall");
+                param.put("PublicKey",pubKey);
+                param.put("Region",regionId);
+                if(StringUtils.isNotEmpty(projectId)){
+                    param.put("ProjectId",projectId);
+                }
+                param.put("GroupId",groupId);
+                String signature = getSignature(param,pivKey);
+                param.put("Signature",signature);
+                String str = HttpRequest.post(url,param);
+                JSONObject json = JSONObject.fromObject(str);
+                if(json.getInt("RetCode") != 0){
+                    log.info("Rcloud-查询防火墙详情失败：{}",str);
+                    continue;
+                }
+                JSONArray dataArray = json.optJSONArray("DataSet");
+                if(dataArray == null || dataArray.size() == 0){
+                    continue;
+                }
+                JSONObject data = dataArray.getJSONObject(0);
+                int resourceCount = data.optInt("ResourceCount", -1);
+                if(resourceCount == 0){
+                    DeleteFirewallVO delVO = deleteFirewall(DeleteFirewallSO.builder().fwId(fwId).build());
+                    if(delVO != null && CommonUtil.SUCCESS_CODE.equals(delVO.getCode())){
+                        log.info("Rcloud-清理无绑定防火墙{}成功", fwId);
+                    }
+                }else{
+                    log.info("Rcloud-防火墙{}仍有{}台主机在使用，已保留不删除", fwId, resourceCount);
+                }
+            }catch (Exception e){
+                log.info("Rcloud-清理无绑定防火墙{}异常：{}", fwId, e.getMessage());
+            }
+        }
+    }
+
+    /**
+     * 删除防火墙
+     * @param deleteFirewallSO
+     * @return
+     * @throws Exception
+     */
+    @Override
+    public DeleteFirewallVO deleteFirewall(DeleteFirewallSO deleteFirewallSO) throws Exception {
+        Map<String,String> param = new TreeMap<>();
+        param.put("Action","DeleteFirewall");
+        param.put("PublicKey",pubKey);
+        param.put("Region",regionId);
+        if(StringUtils.isNotEmpty(projectId)){
+            param.put("ProjectId",projectId);
+        }
+        param.put("FWId",deleteFirewallSO.getFwId());
+        String signature = getSignature(param,pivKey);
+        param.put("Signature",signature);
+        String str = HttpRequest.post(url,param);
+        JSONObject json = JSONObject.fromObject(str);
+        if(json.getInt("RetCode") == 0){
+            log.info("Rcloud-删除防火墙{}成功", deleteFirewallSO.getFwId());
+            return DeleteFirewallVO.builder()
+                    .code(CommonUtil.SUCCESS_CODE)
+                    .msg(CommonUtil.SUCCESS_MSG)
+                    .build();
+        }else{
+            log.info("Rcloud-删除防火墙{}失败：{}",deleteFirewallSO.getFwId(),str);
+            return DeleteFirewallVO.builder()
+                    .code(CommonUtil.FAIL_CODE)
+                    .msg(CommonUtil.FAIL_MSG)
+                    .build();
+        }
     }
 
     /**
@@ -1086,6 +1299,13 @@ public class RcloudCaller implements BaseCaller{
                     .code(CommonUtil.FAIL_CODE)
                     .msg(CommonUtil.FAIL_MSG)
                     .build();
+        }
+        /** 关机后、销毁前解绑防火墙并清理无主防火墙：
+         * 运行中解绑会报4361(security group is in use)；销毁后绑定关系随主机消失查不到，所以必须在关机后解绑 **/
+        try{
+            unbindAndCleanFirewalls(destroySO.getInstanceId());
+        }catch (Exception e){
+            log.info("Rcloud-主机{}销毁前防火墙解绑异常（不阻塞销毁）：{}",destroySO.getInstanceId(),e.getMessage());
         }
         Map<String,String> param = new TreeMap<>();
         param.put("Action","TerminateUHostInstance");
