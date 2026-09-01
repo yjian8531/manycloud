@@ -476,13 +476,26 @@ public class OpenInstanceServiceImpl implements OpenInstanceService {
         try{
             BaseCaller caller = buildCaller(info);
 
+            /** AWS Lightsail无安全组实体，端口规则直接挂在实例上：不走同名复用/绑定流程 **/
+            if("AWSLS".equals(info.getLabel())){
+                createSecuritySO.setInstanceId(info.getServiceNo());
+                CreateSecurityVO vo = caller.createFirewallTo(createSecuritySO);
+                if(vo == null || !CommonUtil.SUCCESS_CODE.equals(vo.getCode())){
+                    return new ResultMessage(ResultMessage.FAILED_CODE, "安全组规则创建失败：" + (vo == null ? "无响应" : vo.getMsg()));
+                }
+                Map<String, Object> data = new HashMap<>();
+                data.put("fwId", vo.getFwId());
+                data.put("groupId", vo.getFwId()); // Lightsail用实例名充当groupId
+                return new ResultMessage(ResultMessage.SUCCEED_CODE, "安全组创建成功，已绑定到该主机", data);
+            }
+
             /** 防火墙名称直接用上游传入的name，本地不拼装 **/
             String fwName = createSecuritySO.getName();
             if(StringUtils.isEmpty(fwName)){
                 return new ResultMessage(ResultMessage.FAILED_CODE, "缺少必要参数：name");
             }
 
-            /** 参考liebao：先按名字查云端是否已有同名防火墙，有则直接绑定复用，没有才创建 **/
+            /** 参考先按名字查云端是否已有同名防火墙，有则直接绑定复用，没有才创建 **/
             QueryFirewallVO existFw = caller.queryFirewall(QueryFirewallSO.builder()
                     .name(fwName)
                     .build());
@@ -662,7 +675,8 @@ public class OpenInstanceServiceImpl implements OpenInstanceService {
         for (FirewallRule rule : callerVo.getRules()) {
             // 只转换有实际意义的字段，忽略null值
             ApiFirewallRuleVO apiRule = ApiFirewallRuleVO.builder()
-                    .protocol(rule.getProtocol())
+                    // 协议统一转大写（如AWS Lightsail云端返回小写tcp，对齐其他平台）
+                    .protocol(rule.getProtocol() != null ? rule.getProtocol().toUpperCase() : null)
                     .port(rule.getPort())
                     .source(rule.getIpAddress())
                     .action(rule.getAction())
