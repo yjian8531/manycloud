@@ -476,8 +476,8 @@ public class OpenInstanceServiceImpl implements OpenInstanceService {
         try{
             BaseCaller caller = buildCaller(info);
 
-            /** AWS Lightsail无安全组实体，端口规则直接挂在实例上：不走同名复用/绑定流程 **/
-            if("AWSLS".equals(info.getLabel())){
+            /** AWS Lightsail/阿里云轻量无安全组实体，端口规则直接挂在实例上：不走同名复用/绑定流程 **/
+            if("AWSLS".equals(info.getLabel()) || "ALIYUN".equals(info.getLabel())){
                 createSecuritySO.setInstanceId(info.getServiceNo());
                 CreateSecurityVO vo = caller.createFirewallTo(createSecuritySO);
                 if(vo == null || !CommonUtil.SUCCESS_CODE.equals(vo.getCode())){
@@ -485,7 +485,7 @@ public class OpenInstanceServiceImpl implements OpenInstanceService {
                 }
                 Map<String, Object> data = new HashMap<>();
                 data.put("fwId", vo.getFwId());
-                data.put("groupId", vo.getFwId()); // Lightsail用实例名充当groupId
+                data.put("groupId", vo.getFwId()); // 轻量平台用实例ID充当groupId
                 return new ResultMessage(ResultMessage.SUCCEED_CODE, "安全组创建成功，已绑定到该主机", data);
             }
 
@@ -513,7 +513,8 @@ public class OpenInstanceServiceImpl implements OpenInstanceService {
                 existed = true;
                 log.info("安全组{}已存在，直接绑定主机{}", fwId, info.getInstanceId());
             }else{
-                /** 不存在：创建新防火墙 **/
+                /** 不存在：创建新防火墙（createFirewallTo需要云平台真实实例ID，如阿里云轻量b02f8ac7...、不能传LTM内部ID） **/
+                createSecuritySO.setInstanceId(info.getServiceNo());
                 CreateSecurityVO vo = caller.createFirewallTo(createSecuritySO);
                 if(vo == null || !CommonUtil.SUCCESS_CODE.equals(vo.getCode())){
                     return new ResultMessage(ResultMessage.FAILED_CODE, "安全组规则创建失败");
