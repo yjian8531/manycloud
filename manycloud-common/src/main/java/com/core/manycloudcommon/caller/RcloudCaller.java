@@ -901,6 +901,84 @@ public class RcloudCaller implements BaseCaller{
     }
 
     /**
+     * 按主机查询防火墙：DescribeSecurityGroup按ResourceId查，响应里已含防火墙信息和Rule规则数组，
+     * 一次请求即可，无需再调DescribeFirewall全量比对（且FWId与GroupId值不同，按GroupId比对会匹配失败）
+     */
+    private QueryFirewallVO queryFirewallByResource(String resourceId) {
+        try {
+            Map<String,String> param = new TreeMap<>();
+            param.put("Action","DescribeSecurityGroup");
+            param.put("PublicKey",pubKey);
+            param.put("Region",regionId);
+            if(StringUtils.isNotEmpty(projectId)){
+                param.put("ProjectId",projectId);
+            }
+            param.put("ResourceType","uhost");
+            param.put("ResourceId",resourceId);
+            String signature = getSignature(param,pivKey);
+            param.put("Signature",signature);
+            String str = HttpRequest.post(url,param);
+//            log.info("Rcloud-DescribeSecurityGroup响应：{}",str);
+            JSONObject json = JSONObject.fromObject(str);
+            if(json.getInt("RetCode") == 0){
+                JSONArray dataSet = json.optJSONArray("DataSet");
+                if(dataSet != null){
+                    for(int i = 0; i < dataSet.size(); i++){
+                        JSONObject data = dataSet.getJSONObject(i);
+                        // Type=0用户自建；非0是官方推荐模板，跳过
+                        String type = data.opt("Type") == null ? null : String.valueOf(data.opt("Type"));
+                        if(!"0".equals(type)){
+                            log.info("Rcloud-主机{}绑定的防火墙{}为官方模板(Type={})，跳过", resourceId, data.optString("FirewallId"), type);
+                            continue;
+                        }
+                        return parseFirewallData(data);
+                    }
+                }
+            }else{
+                log.info("Rcloud-DescribeSecurityGroup失败：{}",str);
+            }
+        } catch (Exception e) {
+            log.info("Rcloud-按主机查询防火墙异常：{}", e.getMessage());
+        }
+        return QueryFirewallVO.builder()
+                .code(CommonUtil.SUCCESS_CODE)
+                .msg("未找到主机绑定的用户自建防火墙")
+                .build();
+    }
+
+    /** 从DescribeSecurityGroup/DescribeFirewall的数据条目解析防火墙信息及规则 */
+    private QueryFirewallVO parseFirewallData(JSONObject data) {
+        List<FirewallRule> rules = new ArrayList<>();
+        JSONArray ruleArray = data.optJSONArray("Rule");
+        if (ruleArray != null) {
+            for (int j = 0; j < ruleArray.size(); j++) {
+                JSONObject rule = ruleArray.getJSONObject(j);
+                FirewallRule ruleInfo = new FirewallRule();
+                ruleInfo.setProtocol(rule.optString("ProtocolType"));
+                ruleInfo.setPort(rule.optString("DstPort"));
+                ruleInfo.setAction(rule.optString("RuleAction"));
+                ruleInfo.setPriority(rule.optString("Priority"));
+                ruleInfo.setIpAddress(rule.optString("SrcIP"));
+                ruleInfo.setRemark(rule.optString("Remark"));
+                rules.add(ruleInfo);
+            }
+        }
+        // DescribeFirewall返回FWId，DescribeSecurityGroup返回FirewallId，两者取其一
+        String fwId = data.optString("FWId");
+        if(StringUtils.isEmpty(fwId)){
+            fwId = data.optString("FirewallId");
+        }
+        return QueryFirewallVO.builder()
+                .groupId(data.optString("GroupId"))
+                .fwId(fwId)
+                .name(data.optString("Name"))
+                .rules(rules)
+                .code(CommonUtil.SUCCESS_CODE)
+                .msg("查询成功")
+                .build();
+    }
+
+    /**
      * 查询防火墙
      * @param queryFirewallSO
      * @return
@@ -912,6 +990,13 @@ public class RcloudCaller implements BaseCaller{
         String fwId = null;
         String fwName = null;
         List<FirewallRule> rules = new ArrayList<>();
+
+        // 按主机查询：DescribeSecurityGroup响应已含防火墙信息和规则，一次请求直接返回
+        if(StringUtils.isEmpty(queryFirewallSO.getFwId())
+                && StringUtils.isEmpty(queryFirewallSO.getName())
+                && StringUtils.isNotEmpty(queryFirewallSO.getInstanceId())){
+            return queryFirewallByResource(queryFirewallSO.getInstanceId());
+        }
 
         Map<String,String> param = new TreeMap<>();
         param.put("Action","DescribeFirewall");
@@ -932,13 +1017,6 @@ public class RcloudCaller implements BaseCaller{
 
         if(json.getInt("RetCode") == 0){
             JSONArray dataArray = json.getJSONArray("DataSet");
-            // 按主机查询时：先调DescribeSecurityGroup拿该主机绑定的GroupId集合
-            Set<String> boundGroupIds = null;
-            if(StringUtils.isEmpty(queryFirewallSO.getFwId())
-                    && StringUtils.isEmpty(queryFirewallSO.getName())
-                    && StringUtils.isNotEmpty(queryFirewallSO.getInstanceId())){
-                boundGroupIds = queryBoundGroupIds(queryFirewallSO.getInstanceId());
-            }
             for(int i = 0 ; i < dataArray.size() ; i++){
                 JSONObject data = dataArray.getJSONObject(i);
                 boolean isMatch = false;
@@ -946,30 +1024,9 @@ public class RcloudCaller implements BaseCaller{
                     isMatch = queryFirewallSO.getFwId().equals(data.getString("FWId"));
                 }else if(StringUtils.isNotEmpty(queryFirewallSO.getName())){
                     isMatch = queryFirewallSO.getName().equals(data.getString("Name"));
-                }else if(boundGroupIds != null){
-                    // 该主机绑定的防火墙中包含此条
-                    isMatch = boundGroupIds.contains(data.getString("GroupId"));
                 }
                 if (isMatch) {
-                    groupId = data.getString("GroupId");
-                    fwId = data.getString("FWId");
-                    fwName = data.getString("Name");
-
-                    JSONArray ruleArray = data.optJSONArray("Rule");
-                    if (ruleArray != null) {
-                        for (int j = 0; j < ruleArray.size(); j++) {
-                            JSONObject rule = ruleArray.getJSONObject(j);
-                            FirewallRule ruleInfo = new FirewallRule();
-                            ruleInfo.setProtocol(rule.optString("ProtocolType"));
-                            ruleInfo.setPort(rule.optString("DstPort"));
-                            ruleInfo.setAction(rule.optString("RuleAction"));
-                            ruleInfo.setPriority(rule.optString("Priority"));
-                            ruleInfo.setIpAddress(rule.optString("SrcIP"));
-                            ruleInfo.setRemark(rule.optString("Remark"));
-                            rules.add(ruleInfo);
-                        }
-                    }
-                    break;
+                    return parseFirewallData(data);
                 }
             }
         }else{

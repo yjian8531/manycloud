@@ -583,7 +583,7 @@ public class UcloudCaller implements BaseCaller{
         Set<String> groupIds = new HashSet<>();
         for(Map.Entry<String,String> entry : fwIdTypeMap.entrySet()){
             String type = entry.getValue();
-            // Type=0用户自建（可解绑）；Type=1等非0是官方推荐模板，不解绑（2026-08-28实测：183201官方Type=1，201885自建Type=0）
+            // Type=0用户自建（可解绑）；Type=1等非0是官方推荐模板，不解绑
             if(!"0".equals(type)){
                 log.info("ucloud-主机{}绑定的防火墙{}为官方模板(Type={})，跳过不解绑", resourceId, entry.getKey(), type);
                 continue;
@@ -591,6 +591,84 @@ public class UcloudCaller implements BaseCaller{
             groupIds.add(entry.getKey());
         }
         return groupIds;
+    }
+
+    /**
+     * 按主机查询防火墙：DescribeSecurityGroup按ResourceId查，响应里已含防火墙信息和Rule规则数组，
+     * 一次请求即可，无需再调DescribeFirewall全量比对
+     */
+    private QueryFirewallVO queryFirewallByResource(String resourceId) {
+        try {
+            Map<String,String> param = new TreeMap<>();
+            param.put("Action","DescribeSecurityGroup");
+            param.put("PublicKey",pubKey);
+            param.put("Region",regionId);
+            if(StringUtils.isNotEmpty(projectId)){
+                param.put("ProjectId",projectId);
+            }
+            param.put("ResourceType","ulhost");
+            param.put("ResourceId",resourceId);
+            String signature = getSignature(param,pivKey);
+            param.put("Signature",signature);
+            String str = HttpRequest.post(url,param);
+//            log.info("Ucloud-DescribeSecurityGroup响应：{}",str);
+            JSONObject json = JSONObject.fromObject(str);
+            if(json.getInt("RetCode") == 0){
+                JSONArray dataSet = json.optJSONArray("DataSet");
+                if(dataSet != null){
+                    for(int i = 0; i < dataSet.size(); i++){
+                        JSONObject data = dataSet.getJSONObject(i);
+                        // Type=0用户自建；非0是官方推荐模板，跳过
+                        String type = data.opt("Type") == null ? null : String.valueOf(data.opt("Type"));
+                        if(!"0".equals(type)){
+                            log.info("ucloud-主机{}绑定的防火墙{}为官方模板(Type={})，跳过", resourceId, data.optString("FirewallId"), type);
+                            continue;
+                        }
+                        return parseFirewallData(data);
+                    }
+                }
+            }else{
+                log.info("Ucloud-DescribeSecurityGroup失败：{}",str);
+            }
+        } catch (Exception e) {
+            log.info("Ucloud-按主机查询防火墙异常：{}", e.getMessage());
+        }
+        return QueryFirewallVO.builder()
+                .code(CommonUtil.SUCCESS_CODE)
+                .msg("未找到主机绑定的用户自建防火墙")
+                .build();
+    }
+
+    /** 从DescribeSecurityGroup/DescribeFirewall的数据条目解析防火墙信息及规则 */
+    private QueryFirewallVO parseFirewallData(JSONObject data) {
+        List<FirewallRule> rules = new ArrayList<>();
+        JSONArray ruleArray = data.optJSONArray("Rule");
+        if (ruleArray != null) {
+            for (int j = 0; j < ruleArray.size(); j++) {
+                JSONObject rule = ruleArray.getJSONObject(j);
+                FirewallRule ruleInfo = new FirewallRule();
+                ruleInfo.setProtocol(rule.optString("ProtocolType"));
+                ruleInfo.setPort(rule.optString("DstPort"));
+                ruleInfo.setAction(rule.optString("RuleAction"));
+                ruleInfo.setPriority(rule.optString("Priority"));
+                ruleInfo.setIpAddress(rule.optString("SrcIP"));
+                ruleInfo.setRemark(rule.optString("Remark"));
+                rules.add(ruleInfo);
+            }
+        }
+        // DescribeFirewall返回FWId，DescribeSecurityGroup返回FirewallId，两者取其一
+        String fwId = data.optString("FWId");
+        if(StringUtils.isEmpty(fwId)){
+            fwId = data.optString("FirewallId");
+        }
+        return QueryFirewallVO.builder()
+                .groupId(data.optString("GroupId"))
+                .fwId(fwId)
+                .name(data.optString("Name"))
+                .rules(rules)
+                .code(CommonUtil.SUCCESS_CODE)
+                .msg("查询成功")
+                .build();
     }
 
     /**
@@ -643,6 +721,13 @@ public class UcloudCaller implements BaseCaller{
      */
     public QueryFirewallVO queryFirewall(QueryFirewallSO queryFirewallSO) throws Exception {
 
+        // 按主机查询：DescribeSecurityGroup响应已含防火墙信息和规则，一次请求直接返回
+        if(StringUtils.isEmpty(queryFirewallSO.getFwId())
+                && StringUtils.isEmpty(queryFirewallSO.getName())
+                && StringUtils.isNotEmpty(queryFirewallSO.getInstanceId())){
+            return queryFirewallByResource(queryFirewallSO.getInstanceId());
+        }
+
         String groupId = null;
         String fwId = null;
         String fwName = null;
@@ -667,13 +752,6 @@ public class UcloudCaller implements BaseCaller{
 
         if(json.getInt("RetCode") == 0){
             JSONArray dataArray = json.getJSONArray("DataSet");
-            // 按主机查询时：先调DescribeSecurityGroup拿该主机绑定的GroupId集合
-            Set<String> boundGroupIds = null;
-            if(StringUtils.isEmpty(queryFirewallSO.getFwId())
-                    && StringUtils.isEmpty(queryFirewallSO.getName())
-                    && StringUtils.isNotEmpty(queryFirewallSO.getInstanceId())){
-                boundGroupIds = queryBoundGroupIds(queryFirewallSO.getInstanceId());
-            }
             for(int i = 0 ; i < dataArray.size() ; i++){
                 JSONObject data = dataArray.getJSONObject(i);
                 boolean isMatch = false;
@@ -681,31 +759,9 @@ public class UcloudCaller implements BaseCaller{
                     isMatch = queryFirewallSO.getFwId().equals(data.getString("FWId"));
                 }else if(StringUtils.isNotEmpty(queryFirewallSO.getName())){
                     isMatch = queryFirewallSO.getName().equals(data.getString("Name"));
-                }else if(boundGroupIds != null){
-                    // 该主机绑定的防火墙中包含此条
-                    isMatch = boundGroupIds.contains(data.getString("GroupId"));
                 }
                 if (isMatch) {
-                    groupId = data.getString("GroupId");
-                    fwId = data.getString("FWId");
-                    fwName = data.getString("Name");
-
-                    // 解析规则数组，提取协议和端口
-                    JSONArray ruleArray = data.optJSONArray("Rule");
-                    if (ruleArray != null) {
-                        for (int j = 0; j < ruleArray.size(); j++) {
-                            JSONObject rule = ruleArray.getJSONObject(j);
-                            FirewallRule ruleInfo = new FirewallRule();
-                            ruleInfo.setProtocol(rule.optString("ProtocolType"));
-                            ruleInfo.setPort(rule.optString("DstPort"));
-                            ruleInfo.setAction(rule.optString("RuleAction"));
-                            ruleInfo.setPriority(rule.optString("Priority"));
-                            ruleInfo.setIpAddress(rule.optString("SrcIP"));
-                            ruleInfo.setRemark(rule.optString("Remark"));
-                            rules.add(ruleInfo);
-                        }
-                    }
-                    break;
+                    return parseFirewallData(data);
                 }
             }
         }else{
