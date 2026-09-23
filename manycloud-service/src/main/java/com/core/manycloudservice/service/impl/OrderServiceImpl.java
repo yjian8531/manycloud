@@ -16,10 +16,12 @@ import com.core.manycloudcommon.model.AccountApi;
 import com.core.manycloudcommon.model.SyslogModel;
 import com.core.manycloudcommon.utils.CommonUtil;
 import com.core.manycloudcommon.utils.DateUtil;
+import com.core.manycloudcommon.utils.RedisUtil;
 import com.core.manycloudcommon.utils.ResultMessage;
 import com.core.manycloudcommon.utils.StringUtils;
 import com.core.manycloudcommon.vo.order.ShoppingListVO;
 import com.core.manycloudservice.service.FinanceService;
+import com.core.manycloudservice.service.OrderExceService;
 import com.core.manycloudservice.service.OrderService;
 import com.core.manycloudservice.so.order.*;
 import com.core.manycloudservice.util.WeiXinCaller;
@@ -46,6 +48,9 @@ public class OrderServiceImpl implements OrderService {
 
     @Autowired
     private NodeNetworkMapper nodeNetworkMapper;
+
+    @Autowired
+    private OrderExceService orderExceService;
 
     @Autowired
     private NodeModelMapper nodeModelMapper;
@@ -316,140 +321,185 @@ public class OrderServiceImpl implements OrderService {
 
     /**
      * 结算订单(购买)
+     * 第一层防重:Redis锁,同一订单同时只允许一个请求进入结算(连点/重复提交直接拒绝);
+     * 进程意外死亡时锁10分钟自动过期,正常流程在finally中释放。
      * @param orderNos
      * @return
      */
     @Transactional(rollbackFor = Exception.class)
     public ResultMessage buy(String userId, List<String> orderNos,BigDecimal amount){
 
-        UserFinance uf = userFinanceMapper.selectByUserId(userId);
-        if(uf.getValidNum().compareTo(amount) < 0){
-            return new ResultMessage(ResultMessage.FAILED_CODE,"余额不足");
-        }
-
-        BigDecimal totalAmount = BigDecimal.valueOf(0);
-        int totalNum = 0;
-        int failNum = 0;
-
-        for(String orderNo : orderNos){
-
-            OrderInfo orderInfo = orderInfoMapper.selectByNo(orderNo);
-            NodeInfo nodeInfo = nodeInfoMapper.selectByPrimaryKey(orderInfo.getNodeId());
-            totalNum = totalNum + orderInfo.getNum();
-            List<InstanceInfo> instanceInfoList = new ArrayList<>();
-
-            for(int i = 0 ; i < orderInfo.getNum() ; i++){
-
-                InstanceInfo instanceInfo = new InstanceInfo();
-                String instanceId = CommonUtil.getOnlyNo(MainEnum.MAIN);
-                instanceInfo.setInstanceId(instanceId);
-                instanceInfo.setOrderNo(orderInfo.getOrderNo());
-                instanceInfo.setUserId(orderInfo.getUserId());
-                instanceInfo.setType(0);
-                instanceInfo.setNodeId(orderInfo.getNodeId());
-                instanceInfo.setLabel(orderInfo.getLabel());
-                PlatformAccount platformAccount = platformAccountMapper.selectDefault(orderInfo.getLabel());
-                instanceInfo.setAccountId(platformAccount.getId());
-                instanceInfo.setModelId(orderInfo.getModelId());
-                instanceInfo.setCpu(orderInfo.getCpu());
-                instanceInfo.setRam(orderInfo.getRam());
-                instanceInfo.setConnectPwd(CommonUtil.getConnectPwd(PlatformLabelEnum.getByLabel(orderInfo.getLabel())));
-                instanceInfo.setSysDisk(orderInfo.getSysDisk());
-                instanceInfo.setDataDisk(orderInfo.getDataDisk());
-                instanceInfo.setBandwidth(orderInfo.getBandwidth());
-                instanceInfo.setFlow(orderInfo.getFlow());
-                instanceInfo.setImage(orderInfo.getImage());
-                instanceInfo.setImageId(orderInfo.getImageId());
-                instanceInfo.setPeriod(orderInfo.getPeriod());
-                instanceInfo.setStatus(0);
-                instanceInfo.setCreateTime(new Date());
-                Date endTime = null;
-                if(orderInfo.getPeriod() == 0){//按天购买
-                    endTime = DateUtil.addDateDays(new Date(),orderInfo.getDuration());
-                }else if(orderInfo.getPeriod() == 1){//按月购买
-                    endTime = DateUtil.daysBeMonth(new Date(),orderInfo.getDuration());
-                }else if(orderInfo.getPeriod() == 2){//按固定月购买(30天)
-                    endTime = DateUtil.addDateDays(new Date(),(orderInfo.getDuration() * 30));
-
+        List<String> lockKeys = new ArrayList<>();
+        try{
+            for(String orderNo : orderNos){
+                String lockKey = "buy:lock:" + orderNo;
+                Long ok = RedisUtil.setnx(lockKey,"1");
+                if(ok != null && ok == 0){
+                    //该订单已有请求在处理:拒绝本次提交(前面已抢到的锁在finally统一释放)
+                    return new ResultMessage(ResultMessage.FAILED_CODE,"订单处理中，请勿重复提交");
                 }
-                instanceInfo.setEndTime(endTime);
-                instanceInfo.setUpdateTime(new Date());
-                int r = instanceInfoMapper.insertSelective(instanceInfo);
-                if(r > 0){
-                    instanceInfoList.add(instanceInfo);
+                if(ok != null && ok == 1){
+                    //兜底:进程意外死亡时key最多留10分钟自动解锁(正常流程在finally提前删除)
+                    RedisUtil.expire(lockKey,600);
+                    lockKeys.add(lockKey);
+                }
+                //ok==null:Redis异常,放行由订单状态翻转兜底,不因Redis故障拒绝下单
+            }
 
-                    /** 累计创建主机请求成功-冻结金额 **/
-                    totalAmount = totalAmount.add(orderInfo.getOnlyPrice());
+            UserFinance uf = userFinanceMapper.selectByUserId(userId);
+            if(uf.getValidNum().compareTo(amount) < 0){
+                return new ResultMessage(ResultMessage.FAILED_CODE,"余额不足");
+            }
 
-                    /** 添加财务账单明细 **/
-                    FinanceDetail financeDetail = new FinanceDetail();
-                    financeDetail.setUserId(orderInfo.getUserId());
-                    financeDetail.setFinanceNo(CommonUtil.getRandomStr(12));
-                    financeDetail.setProductNo(instanceInfo.getInstanceId());
-                    financeDetail.setType(1);//消费类型
-                    financeDetail.setMoneyNum(orderInfo.getOnlyPrice());
-                    financeDetail.setPeriod(orderInfo.getPeriod());
-                    financeDetail.setTag("buy");//购买
-                    financeDetail.setDirection(1);//支出
-                    financeDetail.setWay(2);//交易方式(0:支付宝,1:微信,2:账号余额)
-                    financeDetail.setStatus(0);//未完成
-                    financeDetail.setCreateTime(new Date());
-                    financeDetail.setUpdateTime(new Date());
-                    financeDetailMapper.insertSelective(financeDetail);
+            BigDecimal totalAmount = BigDecimal.valueOf(0);
+            int totalNum = 0;
+            int failNum = 0;
+            List<String> skipOrderNos = new ArrayList<>();
 
-                }else{
+            for(String orderNo : orderNos){
 
-                    /** 累计创建主机请求失败-主机数量 **/
-                    failNum ++;
-                    instanceInfo.setStatus(7);//创建失败状态
+                /** 第二层防重:订单状态原子翻转(0待支付->2交付中)。
+                 *  抢不到说明订单已被处理/正在处理(如发版中断后重买),跳过,防止同一订单重复交付主机 */
+                int claimed = orderInfoMapper.casStatusByOrderNo(orderNo, 0, 2);
+                if(claimed == 0){
+                    //记录被跳过的订单,结算结尾据此返回"重复提交"提示
+                    skipOrderNos.add(orderNo);
+                    continue;
+                }
+
+                OrderInfo orderInfo = orderInfoMapper.selectByNo(orderNo);
+                NodeInfo nodeInfo = nodeInfoMapper.selectByPrimaryKey(orderInfo.getNodeId());
+                totalNum = totalNum + orderInfo.getNum();
+                List<InstanceInfo> instanceInfoList = new ArrayList<>();
+
+                for(int i = 0 ; i < orderInfo.getNum() ; i++){
+
+                    InstanceInfo instanceInfo = new InstanceInfo();
+                    String instanceId = CommonUtil.getOnlyNo(MainEnum.MAIN);
+                    instanceInfo.setInstanceId(instanceId);
+                    instanceInfo.setOrderNo(orderInfo.getOrderNo());
+                    instanceInfo.setUserId(orderInfo.getUserId());
+                    instanceInfo.setType(0);
+                    instanceInfo.setNodeId(orderInfo.getNodeId());
+                    instanceInfo.setLabel(orderInfo.getLabel());
+                    PlatformAccount platformAccount = platformAccountMapper.selectDefault(orderInfo.getLabel());
+                    instanceInfo.setAccountId(platformAccount.getId());
+                    instanceInfo.setModelId(orderInfo.getModelId());
+                    instanceInfo.setCpu(orderInfo.getCpu());
+                    instanceInfo.setRam(orderInfo.getRam());
+                    instanceInfo.setConnectPwd(CommonUtil.getConnectPwd(PlatformLabelEnum.getByLabel(orderInfo.getLabel())));
+                    instanceInfo.setSysDisk(orderInfo.getSysDisk());
+                    instanceInfo.setDataDisk(orderInfo.getDataDisk());
+                    instanceInfo.setBandwidth(orderInfo.getBandwidth());
+                    instanceInfo.setFlow(orderInfo.getFlow());
+                    instanceInfo.setImage(orderInfo.getImage());
+                    instanceInfo.setImageId(orderInfo.getImageId());
+                    instanceInfo.setPeriod(orderInfo.getPeriod());
+                    instanceInfo.setStatus(0);
+                    instanceInfo.setCreateTime(new Date());
+                    Date endTime = null;
+                    if(orderInfo.getPeriod() == 0){//按天购买
+                        endTime = DateUtil.addDateDays(new Date(),orderInfo.getDuration());
+                    }else if(orderInfo.getPeriod() == 1){//按月购买
+                        endTime = DateUtil.daysBeMonth(new Date(),orderInfo.getDuration());
+                    }else if(orderInfo.getPeriod() == 2){//按固定月购买(30天)
+                        endTime = DateUtil.addDateDays(new Date(),(orderInfo.getDuration() * 30));
+
+                    }
+                    instanceInfo.setEndTime(endTime);
                     instanceInfo.setUpdateTime(new Date());
-                    instanceInfoMapper.updateByPrimaryKeySelective(instanceInfo);
+                    int r = instanceInfoMapper.insertSelective(instanceInfo);
+                    if(r > 0){
+                        instanceInfoList.add(instanceInfo);
+
+                        /** 累计创建主机请求成功-冻结金额 **/
+                        totalAmount = totalAmount.add(orderInfo.getOnlyPrice());
+
+                        /** 添加财务账单明细 **/
+                        FinanceDetail financeDetail = new FinanceDetail();
+                        financeDetail.setUserId(orderInfo.getUserId());
+                        financeDetail.setFinanceNo(CommonUtil.getRandomStr(12));
+                        financeDetail.setProductNo(instanceInfo.getInstanceId());
+                        financeDetail.setType(1);//消费类型
+                        financeDetail.setMoneyNum(orderInfo.getOnlyPrice());
+                        financeDetail.setPeriod(orderInfo.getPeriod());
+                        financeDetail.setTag("buy");//购买
+                        financeDetail.setDirection(1);//支出
+                        financeDetail.setWay(2);//交易方式(0:支付宝,1:微信,2:账号余额)
+                        financeDetail.setStatus(0);//未完成
+                        financeDetail.setCreateTime(new Date());
+                        financeDetail.setUpdateTime(new Date());
+                        financeDetailMapper.insertSelective(financeDetail);
+
+                    }else{
+
+                        /** 累计创建主机请求失败-主机数量 **/
+                        failNum ++;
+                        instanceInfo.setStatus(7);//创建失败状态
+                        instanceInfo.setUpdateTime(new Date());
+                        instanceInfoMapper.updateByPrimaryKeySelective(instanceInfo);
+
+                    }
+
 
                 }
-
-
-            }
-            boolean bl = false;
-            //创建主机
-            Map<String,Boolean> result = createInstance(instanceInfoList);
-            for(InstanceInfo instanceInfo : instanceInfoList){
-                boolean rs = result.get(instanceInfo.getInstanceId());
-                if(rs){
-                    bl = true;
-                }else{
-                    /** 累计创建主机请求失败-主机数量 **/
-                    failNum += 1;
-                    /** 减少创建主机请求成功-冻结金额 **/
-                    totalAmount = totalAmount.subtract(orderInfo.getOnlyPrice());
-                    instanceInfoMapper.deleteByPrimaryKey(instanceInfo.getId());
+                boolean bl = false;
+                //创建主机
+                Map<String,Boolean> result = createInstance(instanceInfoList);
+                for(InstanceInfo instanceInfo : instanceInfoList){
+                    boolean rs = result.get(instanceInfo.getInstanceId());
+                    if(rs){
+                        bl = true;
+                    }else{
+                        /** 累计创建主机请求失败-主机数量 **/
+                        failNum += 1;
+                        /** 减少创建主机请求成功-冻结金额 **/
+                        totalAmount = totalAmount.subtract(orderInfo.getOnlyPrice());
+                        instanceInfoMapper.deleteByPrimaryKey(instanceInfo.getId());
+                    }
                 }
-            }
-            if(bl){
-                orderInfo.setStatus(2);//交付中状态
-                orderInfo.setUpdateTime(new Date());
-                orderInfoMapper.updateByPrimaryKeySelective(orderInfo);
-            }
-
-        }
-
-        if(totalNum > failNum){ //下单总数量 大于 失败数量
-            /** 冻结金额 **/
-            int i = userFinanceMapper.updateBalanceByUserId(userId,"seal",totalAmount);
-            if(i > 0){
-                //用户余额更新记录
-                balanceLogMapper.insertChange(userId,"seal",totalAmount,uf.getValidNum(),"下单成功冻结金额");
-                if(failNum > 0){
-                    return new ResultMessage(ResultMessage.SUCCEED_CODE,"下单成功："+(totalNum - failNum)+" 台,扣除金额："+totalAmount.toPlainString());
+                if(bl){
+                    orderInfo.setStatus(2);//交付中状态
+                    orderInfo.setUpdateTime(new Date());
+                    orderInfoMapper.updateByPrimaryKeySelective(orderInfo);
                 }else{
-                    return new ResultMessage(ResultMessage.SUCCEED_CODE,"下单成功");
+                    /** 该订单主机全部创建失败:退回待支付状态,允许用户重新结算 */
+                    orderInfoMapper.casStatusByOrderNo(orderNo, 2, 0);
+                }
+
+            }
+
+            if(totalNum > failNum){ //下单总数量 大于 失败数量
+                /** 冻结金额 **/
+                int i = userFinanceMapper.updateBalanceByUserId(userId,"seal",totalAmount);
+                if(i > 0){
+                    //用户余额更新记录
+                    balanceLogMapper.insertChange(userId,"seal",totalAmount,uf.getValidNum(),"下单成功冻结金额");
+                    if(failNum > 0){
+                        return new ResultMessage(ResultMessage.SUCCEED_CODE,"下单成功："+(totalNum - failNum)+" 台,扣除金额："+totalAmount.toPlainString());
+                    }else{
+                        return new ResultMessage(ResultMessage.SUCCEED_CODE,"下单成功");
+                    }
+                }else{
+                    /** 冻结失败=可用余额已不足以支付本次下单,绝不能提交事务(否则等于免费交付主机)。
+                     *  抛出异常触发整体回滚;注意:云厂商可能已开户成功,需根据error日志人工核查销毁 */
+                    log.error("[防资损]用户[{}]订单{}冻结金额{}失败,本次下单已回滚,若云主机已开需人工核查销毁", userId, orderNos, totalAmount.toPlainString());
+                    throw new RuntimeException("余额异常，下单未完成");
                 }
             }else{
-                return new ResultMessage(ResultMessage.SUCCEED_CODE,"余额异常");
+                if(totalNum == 0 && !skipOrderNos.isEmpty()){
+                    /** 本次没有抢到任何订单:全部为重复提交 */
+                    return new ResultMessage(ResultMessage.FAILED_CODE,"订单已处理，请勿重复提交");
+                }
+                return new ResultMessage(ResultMessage.SUCCEED_CODE,"下单失败");
             }
-        }else{
-            return new ResultMessage(ResultMessage.SUCCEED_CODE,"下单失败");
-        }
 
+        }finally {
+            //不管成功失败/异常都释放锁
+            for(String lockKey : lockKeys){
+                RedisUtil.del(lockKey);
+            }
+        }
     }
 
 
@@ -525,6 +575,13 @@ public class OrderServiceImpl implements OrderService {
                 //获取客户端
                 BaseCaller caller = BaseCaller.getCaller(accountApi);
 
+                //共享带宽ID(Rcloud预创建EIP用)
+                String shareId = null;
+                if(bandwidth != null && StringUtils.isNotEmpty(bandwidth.getNetworkParam())){
+                    JSONObject paramJson = JSONObject.fromObject(bandwidth.getNetworkParam());
+                    shareId = paramJson.get("shareId") == null ? null:paramJson.getString("shareId");
+                }
+
                 CreateSO createSO = CreateSO.builder()
                         .pwd(instanceInfo.getConnectPwd())
                         .bundleId(nodeModel.getModelParam())
@@ -538,6 +595,7 @@ public class OrderServiceImpl implements OrderService {
                         .zone(zone)
                         .machineType(machineType)
                         .securityGroupId(securityGroupId)
+                        .shareId(shareId)
                         .build();
                 CreateVO createVO = caller.create(createSO);
                 if(CommonUtil.SUCCESS_CODE.equals(createVO.getCode())){
@@ -564,11 +622,22 @@ public class OrderServiceImpl implements OrderService {
                 }else{
                     result.put(instanceInfo.getInstanceId(),false);
                     log.info("[{}]创建实例失败：{}",instanceInfo.getLabel(),createVO.getMsg());
+                    /** 创建失败记录异常表 **/
+                    saveOrderExce(instanceInfo,createVO.getMsg());
                 }
 
             }catch (Exception e){
                 log.info("订单[{}]结算实例[{}]创建失败------>",instanceInfo.getOrderNo(),instanceInfo.getInstanceId());
                 e.printStackTrace();
+                /** 异常实例也必须写入结果map:缺key会在buy里result.get拆箱NPE,整单回滚,
+                 *  已开的云主机成孤儿机且订单退回待支付,用户重买导致一份钱交付两批机器 **/
+                result.put(instanceInfo.getInstanceId(),false);
+                try{
+                    /** 创建异常记录异常表 **/
+                    saveOrderExce(instanceInfo,"创建异常："+e.getMessage());
+                }catch (Exception ex){
+                    log.info("订单异常记录保存失败：{}",ex.getMessage());
+                }
             }
 
         }
@@ -599,6 +668,16 @@ public class OrderServiceImpl implements OrderService {
         /** 获取续费价格 **/
         BigDecimal price = queryOrderPrice(orderSO);
         return price;
+    }
+    /***
+     * 创建失败写入订单异常表 t_order_exce
+     * 委托OrderExceService独立事务写入:失败记录立即提交,不随本大事务回滚,
+     * 保证"创建报错→结算整体回滚"场景的孤儿机线索可查
+     * @param instanceInfo
+     * @param content 失败原因
+     */
+    private void saveOrderExce(InstanceInfo instanceInfo,String content){
+        orderExceService.save(instanceInfo, content);
     }
 
 
@@ -731,10 +810,18 @@ public class OrderServiceImpl implements OrderService {
                     UserFinance uf = userFinanceMapper.selectByUserId(userId);
                     balanceLogMapper.insertChange(userId,"unbind",price,uf.getValidNum(),"续费失败解冻金额");
                 }
+                /** 续费失败记录异常表 **/
+                saveOrderExce(instanceInfo,"续费失败："+renewVO.getMsg());
                 return new ResultMessage(ResultMessage.SUCCEED_CODE,"续费失败");
             }
         }catch (Exception e){
             e.printStackTrace();
+            try{
+                /** 续费异常记录异常表 **/
+                saveOrderExce(instanceInfo,"续费异常："+e.getMessage());
+            }catch (Exception ex){
+                log.info("订单异常记录保存失败：{}",ex.getMessage());
+            }
             return new ResultMessage(ResultMessage.FAILED_CODE,"续费错误");
         }
     }

@@ -377,4 +377,14 @@
 
     order by o.id desc
   </select>
+
+  <!-- 原子状态翻转（CAS）：仅当订单当前状态为fromStatus时才更新为toStatus，返回影响行数。
+       用于结算防重：并发/重复提交同一订单时，只有一个请求能把 status 0->2 抢成功，其余影响行数为0。 -->
+  <update id="casStatusByOrderNo">
+    update t_order_info
+    set status = #{toStatus,jdbcType=INTEGER},
+        update_time = now()
+    where order_no = #{orderNo,jdbcType=VARCHAR}
+      and status = #{fromStatus,jdbcType=INTEGER}
+  </update>
 </mapper>

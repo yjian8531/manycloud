@@ -17,6 +17,14 @@ public interface OrderInfoMapper {
 
     OrderInfo selectByNo(@Param("orderNo") String orderNo);
 
+    /**
+     * 仅当订单当前状态为0时才更新为2
+     * @return 影响行数（0=状态不满足，抢锁失败；1=成功）
+     */
+    int casStatusByOrderNo(@Param("orderNo") String orderNo,
+                           @Param("fromStatus") Integer fromStatus,
+                           @Param("toStatus") Integer toStatus);
+
     int updateByPrimaryKeySelective(OrderInfo record);
 
     int updateByPrimaryKey(OrderInfo record);

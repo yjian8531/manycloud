@@ -56,6 +56,9 @@ public class InstanceServiceImpl implements InstanceService {
     private NodeNetworkMapper nodeNetworkMapper;
 
     @Autowired
+    private OrderExceMapper orderExceMapper;
+
+    @Autowired
     private NodeModelMapper nodeModelMapper;
 
     @Autowired
@@ -409,11 +412,42 @@ public class InstanceServiceImpl implements InstanceService {
                     UserFinance uf = userFinanceMapper.selectByUserId(userId);
                     balanceLogMapper.insertChange(userId,"unbind",price,uf.getValidNum(),"续费失败解冻金额");
                 }
+                /** 续费失败记录异常表 **/
+                saveOrderExce(instanceInfo,"续费失败："+renewVO.getMsg());
                 return new ResultMessage(ResultMessage.SUCCEED_CODE,"续费失败");
             }
         }catch (Exception e){
             e.printStackTrace();
+            try{
+                /** 续费异常记录异常表 **/
+                saveOrderExce(instanceInfo,"续费异常："+e.getMessage());
+            }catch (Exception ex){
+                log.info("订单异常记录保存失败：{}",ex.getMessage());
+            }
             return new ResultMessage(ResultMessage.FAILED_CODE,"续费错误");
+        }
+    }
+
+    /***
+     * 续费失败写入订单异常表 t_order_exce
+     * @param instanceInfo
+     * @param content 失败原因
+     */
+    private void saveOrderExce(InstanceInfo instanceInfo,String content){
+        try{
+            OrderExce oe = new OrderExce();
+            oe.setUserId(instanceInfo.getUserId());
+            oe.setLabel(instanceInfo.getLabel());
+            /** 主机编号（创建失败时尚无主机编号时用实例ID兜底） **/
+            oe.setInstanceNo(StringUtils.isNotEmpty(instanceInfo.getServiceNo()) ? instanceInfo.getServiceNo() : instanceInfo.getInstanceId());
+            oe.setStatus(0);//待处理
+            oe.setAuthor("SYSTEM");
+            oe.setContent(content);
+            oe.setCreateTime(new Date());
+            oe.setUpdateTime(new Date());
+            orderExceMapper.insertSelective(oe);
+        }catch (Exception e){
+            log.info("订单异常记录写入失败：{}",e.getMessage());
         }
     }
 
