@@ -19,6 +19,5 @@ public class QueryVO {
     /** 数据 **/
     private Map<String,QueryDetailVO> queryDetailMap;
 
-    private Integer total;
 
 }

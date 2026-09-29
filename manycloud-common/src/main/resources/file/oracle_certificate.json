@@ -1,0 +1,20 @@
+{
+  "baolianyun@outlook.com.lob":{
+    "userId":"ocid1.user.oc1..aaaaaaaa7lw7gl32rodowvlnpo4f6douh46tyb5jd3gsyyw4znp5xgs2twza",
+    "tenantId":"ocid1.tenancy.oc1..aaaaaaaax4joztn75ra22ji6fu2wyc6l7vu7f7pd4mi6fh3bvl3fhuwe2h2q",
+    "fingerprint":"7f:f7:da:f0:44:bd:79:26:2e:bb:57:2e:d9:e8:4f:5d",
+    "compartmentId":"ocid1.compartment.oc1..aaaaaaaabdhffy7uiyouii5m2j25wgsyogh4fq736uzgfccqp42m2un5pprq"
+  },
+  "baolianyun@outlook.com":{
+    "userId":"ocid1.user.oc1..aaaaaaaamos6tqyzshrpfvub6v3gmtkzv7s2xcsrdqbuydwkd2zeoqpjf5fq",
+    "tenantId":"ocid1.tenancy.oc1..aaaaaaaa36fknijrqhqthfpis6jiwbtv7pnoieakam5geski6rqkj6tmkoqq",
+    "fingerprint":"40:f5:3b:d3:83:aa:20:38:37:34:be:4d:2d:1e:d8:b5",
+    "compartmentId":"ocid1.compartment.oc1..aaaaaaaajfvvghgp5ifcjucwjvsrnzekwj4enmnvsgjaoh4mxgqth4pu4mza"
+  },
+  "baolianyun2@outlook.com":{
+    "userId":"ocid1.user.oc1..aaaaaaaamos6tqyzshrpfvub6v3gmtkzv7s2xcsrdqbuydwkd2zeoqpjf5fq",
+    "tenantId":"ocid1.tenancy.oc1..aaaaaaaa36fknijrqhqthfpis6jiwbtv7pnoieakam5geski6rqkj6tmkoqq",
+    "fingerprint":"40:f5:3b:d3:83:aa:20:38:37:34:be:4d:2d:1e:d8:b5",
+    "compartmentId":"ocid1.compartment.oc1..aaaaaaaajfvvghgp5ifcjucwjvsrnzekwj4enmnvsgjaoh4mxgqth4pu4mza"
+  }
+}

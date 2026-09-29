@@ -105,7 +105,7 @@ public class UcloudCaller implements BaseCaller{
             log.info("ucloud-创建轻量级云主机失败：{}",str);
             return CreateVO.builder()
                     .code(CommonUtil.FAIL_CODE)
-                    .msg(CommonUtil.FAIL_MSG)
+                    .msg("创建轻量级云主机失败："+str)
                     .build();
         }
 

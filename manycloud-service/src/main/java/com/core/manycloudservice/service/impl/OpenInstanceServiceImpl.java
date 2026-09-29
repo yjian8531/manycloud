@@ -7,6 +7,7 @@ import com.core.manycloudcommon.entity.*;
 import com.core.manycloudcommon.entity.TimerTask;
 import com.core.manycloudcommon.enums.MainEnum;
 import com.core.manycloudcommon.enums.PlatformLabelEnum;
+import com.core.manycloudcommon.enums.PowerStateEnum;
 import com.core.manycloudcommon.enums.TaskTypeEnum;
 import com.core.manycloudcommon.mapper.*;
 import com.core.manycloudcommon.model.AccountApi;
@@ -73,6 +74,9 @@ public class OpenInstanceServiceImpl implements OpenInstanceService {
     private NodeDiskMapper nodeDiskMapper;
     @Autowired
     private NodeNetworkMapper nodeNetworkMapper;
+
+    @Autowired
+    private OrderExceMapper orderExceMapper;
     @Autowired
     private TimerTaskMapper timerTaskMapper;
 
@@ -157,8 +161,8 @@ public class OpenInstanceServiceImpl implements OpenInstanceService {
                     .image(nodeImage.getImageVersion())
                     .imageId(nodeImage.getId())
                     .num(apiOrderSO.getQuantity())
-                    .period(apiOrderSO.getPeriod())
-                    .duration(apiOrderSO.getPeriod())
+                    .period(1)//计费周期类型固定按月
+                    .duration(apiOrderSO.getPeriod())//购买几个月
                     .userId(userId)
                     .build();
 
@@ -178,8 +182,8 @@ public class OpenInstanceServiceImpl implements OpenInstanceService {
             orderInfo.setOrderNo(CommonUtil.getOnlyNo(MainEnum.ORDER));
             orderInfo.setUserId(userId);
             orderInfo.setNum(apiOrderSO.getQuantity());
-            orderInfo.setPeriod(apiOrderSO.getPeriod());
-            orderInfo.setDuration(apiOrderSO.getPeriod());
+            orderInfo.setPeriod(1);//按月
+            orderInfo.setDuration(apiOrderSO.getPeriod());//购买几个月
             orderInfo.setModelId(apiOrderSO.getModelId());
             orderInfo.setPrice(price);
             orderInfo.setOnlyPrice(price.divide(BigDecimal.valueOf(apiOrderSO.getQuantity()), 2, BigDecimal.ROUND_DOWN));
@@ -236,21 +240,7 @@ public class OpenInstanceServiceImpl implements OpenInstanceService {
                 if(r > 0){
                     instanceInfoList.add(instanceInfo);
                     totalAmount = totalAmount.add(orderInfo.getOnlyPrice());
-
-                    FinanceDetail financeDetail = new FinanceDetail();
-                    financeDetail.setUserId(userId);
-                    financeDetail.setFinanceNo(CommonUtil.getRandomStr(12));
-                    financeDetail.setProductNo(instanceInfo.getInstanceId());
-                    financeDetail.setType(1);
-                    financeDetail.setMoneyNum(orderInfo.getOnlyPrice());
-                    financeDetail.setPeriod(orderInfo.getPeriod());
-                    financeDetail.setTag("buy");
-                    financeDetail.setDirection(1);
-                    financeDetail.setWay(2);
-                    financeDetail.setStatus(0);
-                    financeDetail.setCreateTime(new Date());
-                    financeDetail.setUpdateTime(new Date());
-                    financeDetailMapper.insertSelective(financeDetail);
+                    // 财务明细延后到云厂商创建成功后再记（避免失败实例留孤儿账单）
                 }else{
                     failNum++;
                 }
@@ -261,7 +251,21 @@ public class OpenInstanceServiceImpl implements OpenInstanceService {
             for(InstanceInfo instanceInfo : instanceInfoList){
                 Boolean rs = result.get(instanceInfo.getInstanceId());
                 if(rs != null && rs){
-                    // 成功
+                    // 创建成功才记财务明细（与多地区流程对齐，杜绝孤儿账单）
+                    FinanceDetail financeDetail = new FinanceDetail();
+                    financeDetail.setUserId(userId);
+                    financeDetail.setFinanceNo(CommonUtil.getRandomStr(12));
+                    financeDetail.setProductNo(instanceInfo.getInstanceId());
+                    financeDetail.setType(1);
+                    financeDetail.setMoneyNum(orderInfo.getOnlyPrice());
+                    financeDetail.setPeriod(orderInfo.getDuration());//购买几个月
+                    financeDetail.setTag("buy");
+                    financeDetail.setDirection(1);
+                    financeDetail.setWay(2);
+                    financeDetail.setStatus(0);
+                    financeDetail.setCreateTime(new Date());
+                    financeDetail.setUpdateTime(new Date());
+                    financeDetailMapper.insertSelective(financeDetail);
                 }else{
                     failNum += 1;
                     totalAmount = totalAmount.subtract(orderInfo.getOnlyPrice());
@@ -295,6 +299,29 @@ public class OpenInstanceServiceImpl implements OpenInstanceService {
         } catch (Exception e) {
             log.error("[开放接口]下单异常：{}", e.getMessage(), e);
             return new ResultMessage(ResultMessage.FAILED_CODE, "平台下单失败");
+        }
+    }
+
+    /***
+     * 创建失败写入订单异常表 t_order_exce
+     * @param instanceInfo
+     * @param content 失败原因
+     */
+    private void saveOrderExce(InstanceInfo instanceInfo,String content){
+        try{
+            OrderExce oe = new OrderExce();
+            oe.setUserId(instanceInfo.getUserId());
+            oe.setLabel(instanceInfo.getLabel());
+            /** 主机编号（创建失败时尚无主机编号时用实例ID兜底） **/
+            oe.setInstanceNo(StringUtils.isNotEmpty(instanceInfo.getServiceNo()) ? instanceInfo.getServiceNo() : instanceInfo.getInstanceId());
+            oe.setStatus(0);//待处理
+            oe.setAuthor("SYSTEM");
+            oe.setContent(content);
+            oe.setCreateTime(new Date());
+            oe.setUpdateTime(new Date());
+            orderExceMapper.insertSelective(oe);
+        }catch (Exception e){
+            log.info("订单异常记录写入失败：{}",e.getMessage());
         }
     }
 
@@ -347,6 +374,14 @@ public class OpenInstanceServiceImpl implements OpenInstanceService {
                         .build();
                 BaseCaller caller = BaseCaller.getCaller(accountApi);
 
+                //共享带宽ID(Rcloud预创建EIP用)
+                String shareId = null;
+                NodeNetwork nodeNetwork = nodeNetworkMapper.selectByNode(nodeInfo.getId(),0,instanceInfo.getModelId());
+                if(nodeNetwork != null && StringUtils.isNotEmpty(nodeNetwork.getNetworkParam())){
+                    JSONObject paramJson = JSONObject.fromObject(nodeNetwork.getNetworkParam());
+                    shareId = paramJson.get("shareId") == null ? null:paramJson.getString("shareId");
+                }
+
                 CreateSO createSO = CreateSO.builder()
                         .pwd(instanceInfo.getConnectPwd())
                         .bundleId(nodeModel.getModelParam())
@@ -360,6 +395,7 @@ public class OpenInstanceServiceImpl implements OpenInstanceService {
                         .zone(zone)
                         .machineType(machineType)
                         .securityGroupId(securityGroupId)
+                        .shareId(shareId)
                         // AWS Lightsail特殊用户标识：跳过EIP创建
                         .awsSpecialFlag("AWSLS".equals(instanceInfo.getLabel()) ? 1 : null)
                         .build();
@@ -388,11 +424,18 @@ public class OpenInstanceServiceImpl implements OpenInstanceService {
                     result.put(instanceInfo.getInstanceId(), true);
                 }else{
                     result.put(instanceInfo.getInstanceId(), false);
-                    log.info("创建实例失败：{}", instanceInfo.getLabel(), createVO.getMsg());
+                    /** 创建失败记录异常表（含完整失败原因） **/
+                    saveOrderExce(instanceInfo,createVO.getMsg());
                 }
             }catch (Exception e){
                 log.info("订单[{}]实例[{}]创建异常：{}", instanceInfo.getOrderNo(), instanceInfo.getInstanceId(), e.getMessage());
                 result.put(instanceInfo.getInstanceId(), false);
+                try{
+                    /** 创建异常记录异常表 **/
+                    saveOrderExce(instanceInfo,"创建异常："+e.getMessage());
+                }catch (Exception ex){
+                    log.info("订单异常记录保存失败：{}",ex.getMessage());
+                }
             }
         }
         return result;
@@ -441,6 +484,7 @@ public class OpenInstanceServiceImpl implements OpenInstanceService {
             DestroyVO vo = caller.destroy(DestroySO.builder().instanceId(info.getServiceNo()).build());
             if(CommonUtil.SUCCESS_CODE.equals(vo.getCode())){
                 info.setStatus(6); // 已销毁
+                info.setPowerState(PowerStateEnum.HALTED.getVal()); // 电源状态置为停止
                 info.setUpdateTime(new Date());
                 instanceInfoMapper.updateByPrimaryKeySelective(info);
                 return new ResultMessage(ResultMessage.SUCCEED_CODE, "销毁成功");
@@ -476,8 +520,8 @@ public class OpenInstanceServiceImpl implements OpenInstanceService {
         try{
             BaseCaller caller = buildCaller(info);
 
-            /** AWS Lightsail/阿里云轻量无安全组实体，端口规则直接挂在实例上：不走同名复用/绑定流程 **/
-            if("AWSLS".equals(info.getLabel()) || "ALIYUN".equals(info.getLabel())){
+            /** AWS Lightsail/阿里云轻量/腾讯云轻量无安全组实体，端口规则直接挂在实例上：不走同名复用/绑定流程 **/
+            if("AWSLS".equals(info.getLabel()) || "ALIYUN".equals(info.getLabel()) || "TENCENTLH".equals(info.getLabel())){
                 createSecuritySO.setInstanceId(info.getServiceNo());
                 CreateSecurityVO vo = caller.createFirewallTo(createSecuritySO);
                 if(vo == null || !CommonUtil.SUCCESS_CODE.equals(vo.getCode())){
@@ -714,14 +758,17 @@ public class OpenInstanceServiceImpl implements OpenInstanceService {
                 return new ResultMessage(ResultMessage.FAILED_CODE, "订单信息不能为空");
             }
 
-            // 先计算所有地区的总金额，检查余额是否足够
+            // 先计算所有地区的总金额，检查余额是否足够（价格在此锁定，后续扣款直接使用，跟普通用户"一次算价、按价扣款"一致）
             BigDecimal totalEstimatedAmount = BigDecimal.valueOf(0);
             List<MultiRegionOrderSO.RegionOrder> validOrders = new ArrayList<>();
+            Map<Integer, BigDecimal> regionPriceMap = new HashMap<>();
             Set<Integer> uniqueNodeIds = new HashSet<>();
+            List<MultiRegionResultVO.FailedOrder> failedOrders = new ArrayList<>();
 
             for(MultiRegionOrderSO.RegionOrder regionOrder : orderSO.getOrders()){
-                // 跳过重复的地区
+                // 跳过重复的地区（登记原因，不让地区凭空消失）
                 if(uniqueNodeIds.contains(regionOrder.getNodeId())){
+                    failedOrders.add(createFailedOrder(regionOrder, "该地区重复传了，请合并数量"));
                     continue;
                 }
                 uniqueNodeIds.add(regionOrder.getNodeId());
@@ -730,12 +777,14 @@ public class OpenInstanceServiceImpl implements OpenInstanceService {
                 try {
                     NodeModel nodeModel = nodeModelMapper.selectByPrimaryKey(regionOrder.getModelId());
                     if(nodeModel == null){
-                        continue; // 配置不存在，跳过
+                        failedOrders.add(createFailedOrder(regionOrder, "模版配置不存在"));
+                        continue;
                     }
 
                     NodeInfo nodeInfo = nodeInfoMapper.selectByPrimaryKey(regionOrder.getNodeId());
                     if(nodeInfo == null){
-                        continue; // 节点不存在，跳过
+                        failedOrders.add(createFailedOrder(regionOrder, "节点配置不存在"));
+                        continue;
                     }
 
                     //查询磁盘/带宽/流量默认配置（防止queryOrderPrice计价时空指针）
@@ -758,23 +807,27 @@ public class OpenInstanceServiceImpl implements OpenInstanceService {
                             .modelId(regionOrder.getModelId())
                             .cpu(nodeModel.getCpuVal())
                             .ram(nodeModel.getRamVal())
-                            .sysDisk(estDisk != null && estDisk.getGiveNum() != null ? estDisk.getGiveNum() : BigDecimal.valueOf(50))
+                            .sysDisk(estDisk != null && estDisk.getMinNum() != null ? estDisk.getMinNum() : BigDecimal.valueOf(50))
                             .dataDisk(null)
                             .bandwidth(estBandwidth != null && estBandwidth.getMinNum() != null ? estBandwidth.getMinNum() : BigDecimal.ZERO)
                             .flow(estFlow != null && estFlow.getMinNum() != null ? estFlow.getMinNum() : BigDecimal.ZERO)
                             .num(regionOrder.getQuantity())
-                            .period(regionOrder.getPeriod())
-                            .duration(regionOrder.getPeriod())
+                            .period(1)//计费周期类型固定按月
+                            .duration(regionOrder.getPeriod())//购买几个月
                             .userId(userId)
                             .build();
 
                     BigDecimal regionPrice = orderService.queryOrderPrice(tempOrderSO);
                     if(regionPrice != null && regionPrice.compareTo(BigDecimal.ZERO) > 0){
+                        regionPriceMap.put(regionOrder.getNodeId(), regionPrice);
                         totalEstimatedAmount = totalEstimatedAmount.add(regionPrice);
                         validOrders.add(regionOrder);
+                    }else{
+                        failedOrders.add(createFailedOrder(regionOrder, "该节点价格未配置或无效"));
                     }
                 } catch(Exception e){
                     log.warn("[多地区下单]计算地区{}价格失败：{}", regionOrder.getNodeId(), e.getMessage());
+                    failedOrders.add(createFailedOrder(regionOrder, "算价失败：" + e.getMessage()));
                 }
             }
 
@@ -787,10 +840,8 @@ public class OpenInstanceServiceImpl implements OpenInstanceService {
 
             // 3. 按地区分别处理订单（余额已确认足够）
             List<MultiRegionResultVO.InstanceInfo> successInstances = new ArrayList<>();
-            List<MultiRegionResultVO.FailedOrder> failedOrders = new ArrayList<>();
-            OrderInfo globalOrderInfo = null; // 全局订单记录（只在第一个地区创建）
+            List<String> orderNos = new ArrayList<>(); // 每个地区一张订单
             BigDecimal totalAmount = BigDecimal.valueOf(0);
-            String globalOrderNo = CommonUtil.getOnlyNo(MainEnum.ORDER); // 创建一个总订单号
             Set<Integer> processedNodeIds = new HashSet<>(); // 记录已处理的地区ID
 
             for(MultiRegionOrderSO.RegionOrder regionOrder : validOrders){
@@ -855,77 +906,60 @@ public class OpenInstanceServiceImpl implements OpenInstanceService {
                     BigDecimal bandwidthSize = bandwidth.getMinNum() != null ? bandwidth.getMinNum() : BigDecimal.ZERO;
                     BigDecimal flowSize = flow.getMinNum() != null ? flow.getMinNum() : BigDecimal.ZERO;
 
-                    // 构建临时订单计算价格
-                    OrderSO tempOrderSO = OrderSO.builder()
-                            .nodeId(regionOrder.getNodeId())
-                            .modelId(regionOrder.getModelId())
-                            .cpu(nodeModel.getCpuVal())
-                            .ram(nodeModel.getRamVal())
-                            .sysDisk(sysDiskSize)
-                            .dataDisk(dataDiskSize)
-                            .bandwidth(bandwidthSize)
-                            .flow(flowSize)
-                            .image(nodeImage.getImageVersion())
-                            .imageId(nodeImage.getId())
-                            .num(regionOrder.getQuantity())
-                            .period(regionOrder.getPeriod())
-                            .duration(regionOrder.getPeriod())
-                            .userId(userId)
-                            .build();
-
-                    BigDecimal regionTotalPrice = orderService.queryOrderPrice(tempOrderSO);
+                    // 价格直接使用第一阶段锁定的值（不再重复算价，保证余额校验和实际扣款是同一个数）
+                    BigDecimal regionTotalPrice = regionPriceMap.get(regionOrder.getNodeId());
 
                     if(regionTotalPrice == null || regionTotalPrice.compareTo(BigDecimal.valueOf(0)) < 1){
                         failedOrders.add(createFailedOrder(regionOrder, "无效金额"));
                         continue;
                     }
 
-                    // 只在第一个地区创建全局订单记录
-                    if(globalOrderInfo == null){
-                        globalOrderInfo = new OrderInfo();
-                        globalOrderInfo.setOrderNo(globalOrderNo);
-                        globalOrderInfo.setUserId(userId);
-                        // 注意：数量和价格会在所有地区处理完后更新
-                        globalOrderInfo.setNum(0); // 临时设为0，最后在方法末尾设置为成功实例总数
-                        globalOrderInfo.setPeriod(regionOrder.getPeriod());
-                        globalOrderInfo.setDuration(regionOrder.getPeriod());
-                        globalOrderInfo.setModelId(regionOrder.getModelId());
-                        globalOrderInfo.setPrice(BigDecimal.valueOf(0)); // 先设为0，后续累加
-                        globalOrderInfo.setOnlyPrice(BigDecimal.valueOf(0)); // 先设为0，后续累加
-                        globalOrderInfo.setDiscount(BigDecimal.valueOf(0));
-                        globalOrderInfo.setType(0);
-                        globalOrderInfo.setNodeId(regionOrder.getNodeId());
-                        globalOrderInfo.setLabel(nodeInfo.getLabel());
-                        globalOrderInfo.setCpu(nodeModel.getCpuVal());
-                        globalOrderInfo.setRam(nodeModel.getRamVal());
-                        globalOrderInfo.setSysDisk(sysDiskSize);
-                        globalOrderInfo.setDataDisk(dataDiskSize);
-                        globalOrderInfo.setBandwidth(bandwidthSize);
-                        globalOrderInfo.setFlow(flowSize);
-                        globalOrderInfo.setImage(nodeImage.getImageVersion());
-                        globalOrderInfo.setImageId(nodeImage.getId());
-                        globalOrderInfo.setStatus(0);
-                        globalOrderInfo.setCreateTime(new Date());
-                        globalOrderInfo.setUpdateTime(new Date());
-                        orderInfoMapper.insertSelective(globalOrderInfo);
+                    // 特殊用户使用del=2的特殊账号（提前校验，避免创建出空订单）
+                    PlatformAccount platformAccount = platformAccountMapper.selectByLabelAndDel(nodeInfo.getLabel(), 2);
+                    if(platformAccount == null){
+                        failedOrders.add(createFailedOrder(regionOrder, "该平台暂不支持下单"));
+                        continue;
                     }
+
+                    // 每个地区创建自己的订单（月数/配置/价格都按本地区，云端购买时长取各自订单的duration）
+                    String regionOrderNo = CommonUtil.getOnlyNo(MainEnum.ORDER);
+                    OrderInfo regionOrderInfo = new OrderInfo();
+                    regionOrderInfo.setOrderNo(regionOrderNo);
+                    regionOrderInfo.setUserId(userId);
+                    regionOrderInfo.setNum(regionOrder.getQuantity());
+                    regionOrderInfo.setPeriod(1);//按月
+                    regionOrderInfo.setDuration(regionOrder.getPeriod());//购买几个月
+                    regionOrderInfo.setModelId(regionOrder.getModelId());
+                    regionOrderInfo.setPrice(regionTotalPrice);
+                    regionOrderInfo.setOnlyPrice(regionTotalPrice.divide(BigDecimal.valueOf(regionOrder.getQuantity()), 2, BigDecimal.ROUND_DOWN));
+                    regionOrderInfo.setDiscount(BigDecimal.valueOf(0));
+                    regionOrderInfo.setType(0);
+                    regionOrderInfo.setNodeId(regionOrder.getNodeId());
+                    regionOrderInfo.setLabel(nodeInfo.getLabel());
+                    regionOrderInfo.setCpu(nodeModel.getCpuVal());
+                    regionOrderInfo.setRam(nodeModel.getRamVal());
+                    regionOrderInfo.setSysDisk(sysDiskSize);
+                    regionOrderInfo.setDataDisk(dataDiskSize);
+                    regionOrderInfo.setBandwidth(bandwidthSize);
+                    regionOrderInfo.setFlow(flowSize);
+                    regionOrderInfo.setImage(nodeImage.getImageVersion());
+                    regionOrderInfo.setImageId(nodeImage.getId());
+                    regionOrderInfo.setStatus(0);
+                    regionOrderInfo.setCreateTime(new Date());
+                    regionOrderInfo.setUpdateTime(new Date());
+                    orderInfoMapper.insertSelective(regionOrderInfo);
+                    orderNos.add(regionOrderNo);
 
                     // 创建该地区的所有实例
                     for(int i = 0; i < regionOrder.getQuantity(); i++){
                         InstanceInfo instanceInfo = new InstanceInfo();
                         instanceInfo.setInstanceId(CommonUtil.getOnlyNo(MainEnum.MAIN));
-                        instanceInfo.setOrderNo(globalOrderNo); // 使用总订单号
+                        instanceInfo.setOrderNo(regionOrderNo); // 挂本地区订单
                         instanceInfo.setUserId(userId);
                         instanceInfo.setType(0);
                         instanceInfo.setNodeId(regionOrder.getNodeId());
                         instanceInfo.setLabel(nodeInfo.getLabel());
 
-                        // 特殊用户使用del=2的特殊账号
-                        PlatformAccount platformAccount = platformAccountMapper.selectByLabelAndDel(nodeInfo.getLabel(), 2);
-                        if(platformAccount == null){
-                            failedOrders.add(createFailedOrder(regionOrder, "该平台暂不支持下单"));
-                            break; // 跳出实例创建循环，继续处理下一个地区
-                        }
                         instanceInfo.setAccountId(platformAccount.getId());
                         instanceInfo.setModelId(regionOrder.getModelId());
                         instanceInfo.setCpu(nodeModel.getCpuVal());
@@ -937,10 +971,10 @@ public class OpenInstanceServiceImpl implements OpenInstanceService {
                         instanceInfo.setFlow(flowSize);
                         instanceInfo.setImage(nodeImage.getImageVersion());
                         instanceInfo.setImageId(nodeImage.getId());
-                        instanceInfo.setPeriod(regionOrder.getPeriod());
+                        instanceInfo.setPeriod(1);//按月（与普通用户语义一致，续费按此查月付价格）
                         instanceInfo.setStatus(0);
                         instanceInfo.setCreateTime(new Date());
-                        // 计算到期时间（period就是月数，按月购买逻辑）
+                        // 计算到期时间（regionOrder.getPeriod()即购买几个月）
                         instanceInfo.setEndTime(DateUtil.daysBeMonth(new Date(), regionOrder.getPeriod()));
                         instanceInfo.setUpdateTime(new Date());
 
@@ -961,19 +995,19 @@ public class OpenInstanceServiceImpl implements OpenInstanceService {
                     List<InstanceInfo> regionInstances = new ArrayList<>();
                     List<MultiRegionResultVO.InstanceInfo> currentRegionInstVOs = new ArrayList<>();
 
-                    // 一次遍历：收集当前地区的实例（避免重复查询数据库）
+                    // 一次遍历：收集当前地区的实例（按nodeId匹配，防止不同地区同名导致串单重复创建）
                     for(MultiRegionResultVO.InstanceInfo instVO : successInstances){
-                        if(instVO.getRegion().equals(nodeInfo.getNodeName())){
-                            InstanceInfo dbInfo = instanceInfoMapper.selectById(instVO.getInstanceId());
-                            if(dbInfo != null){
-                                regionInstances.add(dbInfo);
-                                currentRegionInstVOs.add(instVO);
-                            }
+                        InstanceInfo dbInfo = instanceInfoMapper.selectById(instVO.getInstanceId());
+                        if(dbInfo != null && Objects.equals(dbInfo.getNodeId(), regionOrder.getNodeId())){
+                            regionInstances.add(dbInfo);
+                            currentRegionInstVOs.add(instVO);
                         }
                     }
 
-                    // 如果当前地区没有实例，跳过API调用
+                    // 如果当前地区没有实例，跳过API调用（并删除本地区的空订单）
                     if(regionInstances.isEmpty()){
+                        orderInfoMapper.deleteByPrimaryKey(regionOrderInfo.getId());
+                        orderNos.remove(regionOrderNo);
                         continue;
                     }
 
@@ -988,34 +1022,27 @@ public class OpenInstanceServiceImpl implements OpenInstanceService {
                         }
                     }
 
-                    // 为API调用成功的实例创建财务明细
-                    for(MultiRegionResultVO.InstanceInfo instVO : successInstances){
-                        // 只检查当前地区的实例
-                        if(!instVO.getRegion().equals(nodeInfo.getNodeName())){
-                            continue;
-                        }
+                    // 为API调用成功的实例创建财务明细（只遍历当前地区的实例，不跨地区）
+                    for(MultiRegionResultVO.InstanceInfo instVO : currentRegionInstVOs){
                         // 跳过失败的实例
                         if(failedInstances.stream().anyMatch(failed -> failed.getInstanceId().equals(instVO.getInstanceId()))){
                             continue;
                         }
 
-                        InstanceInfo dbInfo = instanceInfoMapper.selectById(instVO.getInstanceId());
-                        if(dbInfo != null){
-                            FinanceDetail financeDetail = new FinanceDetail();
-                            financeDetail.setUserId(userId);
-                            financeDetail.setFinanceNo(CommonUtil.getRandomStr(12));
-                            financeDetail.setProductNo(dbInfo.getInstanceId());
-                            financeDetail.setType(1);
-                            financeDetail.setMoneyNum(new BigDecimal(instVO.getUnitPrice()));
-                            financeDetail.setPeriod(regionOrder.getPeriod());
-                            financeDetail.setTag("buy");
-                            financeDetail.setDirection(1);
-                            financeDetail.setWay(2);
-                            financeDetail.setStatus(0);
-                            financeDetail.setCreateTime(new Date());
-                            financeDetail.setUpdateTime(new Date());
-                            financeDetailMapper.insertSelective(financeDetail);
-                        }
+                        FinanceDetail financeDetail = new FinanceDetail();
+                        financeDetail.setUserId(userId);
+                        financeDetail.setFinanceNo(CommonUtil.getRandomStr(12));
+                        financeDetail.setProductNo(instVO.getInstanceId());
+                        financeDetail.setType(1);
+                        financeDetail.setMoneyNum(new BigDecimal(instVO.getUnitPrice()));
+                        financeDetail.setPeriod(regionOrder.getPeriod());
+                        financeDetail.setTag("buy");
+                        financeDetail.setDirection(1);
+                        financeDetail.setWay(2);
+                        financeDetail.setStatus(0);
+                        financeDetail.setCreateTime(new Date());
+                        financeDetail.setUpdateTime(new Date());
+                        financeDetailMapper.insertSelective(financeDetail);
                     }
 
                     // 处理失败的实例：扣减金额并删除记录
@@ -1038,6 +1065,22 @@ public class OpenInstanceServiceImpl implements OpenInstanceService {
                         failedInstances.stream().anyMatch(failed -> failed.getInstanceId().equals(instVO.getInstanceId()))
                     );
 
+                    // 更新本地区订单为实际成功的数量和金额（失败的实例已删除）
+                    int regionSuccessNum = currentRegionInstVOs.size() - failedInstances.size();
+                    if(regionSuccessNum > 0){
+                        OrderInfo updateRegionOrder = new OrderInfo();
+                        updateRegionOrder.setId(regionOrderInfo.getId());
+                        updateRegionOrder.setNum(regionSuccessNum);
+                        updateRegionOrder.setPrice(regionTotalPrice.divide(BigDecimal.valueOf(regionOrder.getQuantity()), 2, BigDecimal.ROUND_DOWN).multiply(BigDecimal.valueOf(regionSuccessNum)));
+                        updateRegionOrder.setStatus(2); // 部分/全部成功
+                        updateRegionOrder.setUpdateTime(new Date());
+                        orderInfoMapper.updateByPrimaryKeySelective(updateRegionOrder);
+                    }else{
+                        // 该地区全部失败：删除空订单
+                        orderInfoMapper.deleteByPrimaryKey(regionOrderInfo.getId());
+                        orderNos.remove(regionOrderNo);
+                    }
+
                 } catch(Exception e){
                     log.error("[开放接口]多地区下单-地区[{}]处理异常：{}", regionOrder.getNodeId(), e.getMessage(), e);
                     // 查询平台名称，给用户简化的错误信息
@@ -1047,18 +1090,8 @@ public class OpenInstanceServiceImpl implements OpenInstanceService {
                 }
             }
 
-            // 3. 更新订单状态和冻结金额
+            // 3. 冻结金额（各地区订单已在循环内更新为实际成功数量/金额）
             if(successInstances.size() > 0){
-                // 更新全局订单：设置正确的数量和价格
-                OrderInfo updateOrder = new OrderInfo();
-                updateOrder.setId(globalOrderInfo.getId());
-                updateOrder.setNum(successInstances.size()); // 成功实例总数
-                updateOrder.setPrice(totalAmount); // 总金额
-                updateOrder.setOnlyPrice(null); // 多地区订单单价设为null（不同地区价格不同）
-                updateOrder.setStatus(2); // 部分/全部成功
-                updateOrder.setUpdateTime(new Date());
-                orderInfoMapper.updateByPrimaryKeySelective(updateOrder);
-
                 // 扣款
                 int i = userFinanceMapper.updateBalanceByUserId(userId, "seal", totalAmount);
                 if(i > 0){
@@ -1072,7 +1105,7 @@ public class OpenInstanceServiceImpl implements OpenInstanceService {
 
             // 4. 构建返回结果
             MultiRegionResultVO resultVO = new MultiRegionResultVO();
-            resultVO.setOrderNo(globalOrderNo);
+            resultVO.setOrderNos(orderNos); // 全部订单号（每地区一张）
             resultVO.setSuccessNum(successInstances.size());
             resultVO.setTotalAmount(totalAmount.toPlainString());
             resultVO.setInstances(successInstances);

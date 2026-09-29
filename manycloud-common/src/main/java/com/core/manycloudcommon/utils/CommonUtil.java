@@ -335,5 +335,81 @@ public class CommonUtil {
         return prefix + "****" + suffix;
     }
 
+    /**
+     * 解析 Oracle 账户配置：account 以{开头按JSON解析；否则当邮箱去oracle_certificate.json按名查（与liebao一致）
+     * @param account JSON字符串(含 userId, tenantId, fingerprint, compartmentId) 或 邮箱
+     * @return JSONObject
+     */
+    public static JSONObject getOracleAccount(String account) {
+        if (account == null || account.trim().isEmpty()) {
+            throw new IllegalArgumentException("Oracle账户配置不能为空");
+        }
+        String trimmed = account.trim();
+        if (trimmed.startsWith("{")) {
+            try {
+                return JSONObject.fromObject(trimmed);
+            } catch (Exception e) {
+                throw new IllegalArgumentException("Oracle账户配置JSON格式错误：" + account, e);
+            }
+        }
+        /** 邮箱模式：从file/oracle_certificate.json按邮箱查（与liebao共用同一份配置文件） **/
+        try {
+            InputStream is = CommonUtil.class.getClassLoader().getResourceAsStream("file/oracle_certificate.json");
+            if (is == null) {
+                throw new IllegalArgumentException("Oracle账户配置文件不存在：file/oracle_certificate.json");
+            }
+            Scanner scanner = new Scanner(is, StandardCharsets.UTF_8.name());
+            StringBuilder content = new StringBuilder();
+            while (scanner.hasNextLine()) {
+                content.append(scanner.nextLine()).append("\n");
+            }
+            scanner.close();
+            JSONObject json = JSONObject.fromObject(content.toString());
+            if (!json.containsKey(trimmed)) {
+                throw new IllegalArgumentException("Oracle账户配置文件中不存在该账号：" + trimmed);
+            }
+            return json.getJSONObject(trimmed);
+        } catch (IllegalArgumentException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new IllegalArgumentException("读取Oracle账户配置文件失败：" + trimmed, e);
+        }
+    }
+
+    /**
+     * 从文件读取 Oracle 私钥
+     * @param keyNo 私钥文件路径（如 file/oracle.pem）
+     * @return 私钥内容
+     */
+    public static String getOraclePrivateKey(String keyNo) {
+        try {
+            // 读取私钥文件
+            InputStream is = CommonUtil.class.getClassLoader().getResourceAsStream(keyNo);
+            if (is == null) {
+                throw new IllegalArgumentException("Oracle私钥文件不存在：" + keyNo);
+            }
+
+            Scanner scanner = new Scanner(is, StandardCharsets.UTF_8.name());
+            StringBuilder privateKey = new StringBuilder();
+            while (scanner.hasNextLine()) {
+                String line = scanner.nextLine();
+                // 仅跳过空行；必须保留 -----BEGIN/END----- 标记，OCI的StringPrivateKeySupplier要求完整PEM
+                if (!line.trim().isEmpty()) {
+                    privateKey.append(line).append("\n");
+                }
+            }
+            scanner.close();
+
+            String pem = privateKey.toString();
+            if (pem.length() == 0 || !pem.contains("-----BEGIN")) {
+                throw new IllegalArgumentException("Oracle私钥文件不是有效的PEM格式（缺少BEGIN/END标记）：" + keyNo);
+            }
+
+            return pem;
+        } catch (Exception e) {
+            throw new IllegalArgumentException("读取Oracle私钥失败：" + keyNo, e);
+        }
+    }
+
 
 }

@@ -8,7 +8,7 @@ import java.util.List;
  */
 @Data
 public class MultiRegionResultVO {
-    private String orderNo;           // 订单号
+    private List<String> orderNos;    // 全部订单号（每个地区一张订单）
     private Integer successNum;        // 成功数量
     private String totalAmount;       // 总金额
     private List<InstanceInfo> instances;  // 成功的实例

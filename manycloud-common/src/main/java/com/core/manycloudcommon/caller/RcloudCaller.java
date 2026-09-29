@@ -67,11 +67,25 @@ public class RcloudCaller implements BaseCaller{
 
     /**
      * 创建云主机
+     * 流程：先创建EIP（共享带宽无资源时直接下单失败，不创建主机） -> 创建主机（失败则释放EIP） -> 绑定EIP
      * @param createSO
      * @return
      * @throws Exception
      */
     public CreateVO create(CreateSO createSO)throws Exception{
+        /** 预创建EIP：无资源直接失败，避免主机创建成功后卡在等待公网IP **/
+        Map<String,String> eipMap = null;
+        if(StringUtils.isNotEmpty(createSO.getShareId())){
+            eipMap = createEip(createSO.getShareId(), createSO.getPeriod());
+            if(eipMap == null){
+                log.info("rcloud-预创建EIP失败（共享带宽{}可能无资源），下单终止", createSO.getShareId());
+                return CreateVO.builder()
+                        .code(CommonUtil.FAIL_CODE)
+                        .msg("EIP资源不足，创建EIP失败")
+                        .build();
+            }
+        }
+
         Map<String,String> param = new TreeMap<>();
         param.put("Action","CreateUHostInstance");//创建主机
         param.put("PublicKey",pubKey);
@@ -105,24 +119,42 @@ public class RcloudCaller implements BaseCaller{
         if(json.getInt("RetCode") == 0){
             JSONArray uhostIds = json.getJSONArray("UHostIds");
             if(uhostIds.size() > 0){
+                String serviceNo = uhostIds.getString(0);
+                /** 主机创建成功：立即绑定预创建的EIP（绑定失败则释放EIP，由createQuery轮询兜底重新分配绑定） **/
+                if(eipMap != null){
+                    if(bindIp(eipMap.get("id"),serviceNo)){
+                        log.info("rcloud-云主机{}绑定预创建EIP[{}]成功", serviceNo, eipMap.get("id"));
+                    }else{
+                        log.info("rcloud-云主机{}绑定预创建EIP[{}]失败，释放EIP由轮询兜底重试", serviceNo, eipMap.get("id"));
+                        releaseEip(eipMap.get("id"));
+                    }
+                }
                 return CreateVO.builder()
                         .code(CommonUtil.SUCCESS_CODE)
                         .msg(CommonUtil.SUCCESS_MSG)
-                        .instanceIds(Arrays.asList(uhostIds.getString(0)))
+                        .instanceIds(Arrays.asList(serviceNo))
                         .build();
             }else{
                 log.info("rcloud-创建云主机失败：{}",str);
+                if(eipMap != null){
+                    /** 主机未创建成功，释放预创建的EIP避免闲置计费 **/
+                    releaseEip(eipMap.get("id"));
+                }
                 return CreateVO.builder()
                         .code(CommonUtil.FAIL_CODE)
-                        .msg(CommonUtil.FAIL_MSG)
+                        .msg("创建云主机失败："+str)
                         .build();
             }
 
         }else{
             log.info("rcloud-创建云主机失败：{}",str);
+            if(eipMap != null){
+                /** 主机未创建成功，释放预创建的EIP避免闲置计费 **/
+                releaseEip(eipMap.get("id"));
+            }
             return CreateVO.builder()
                     .code(CommonUtil.FAIL_CODE)
-                    .msg(CommonUtil.FAIL_MSG)
+                    .msg("创建云主机失败："+str)
                     .build();
         }
 
@@ -182,7 +214,7 @@ public class RcloudCaller implements BaseCaller{
 
                     for(Object ipObj : ipSet){
                         JSONObject ipJson = JSONObject.fromObject(ipObj);
-                        if("Native".equals(ipJson.getString("Type"))){//原生IP
+                        if("Native".equals(ipJson.getString("Type")) || "EIP".equals(ipJson.getString("Type"))){//原生IP或已绑定EIP
                             ip = ipJson.getString("IP");
                             continue;
                         }
@@ -194,19 +226,37 @@ public class RcloudCaller implements BaseCaller{
 
                     if(ip == null){
 
-                        /** 创建一个绑定共享带宽的EIP **/
+                        /** 创建一个绑定共享带宽的EIP（无资源返回null，走下方等待分支下轮重试） **/
                         Map<String,String> eipMap = createEip(querySO.getShareId(),1);
                         if (eipMap != null){
 
                             String publicIpId = eipMap.get("id");
-                            ip = eipMap.get("ip");
 
-                            //eip绑定实例
-                            bindIp(publicIpId,serviceNo);
+                            //eip绑定实例（绑定失败不视为成功，下轮重试时重新分配绑定）
+                            if(bindIp(publicIpId,serviceNo)){
+                                ip = eipMap.get("ip");
+                            }else{
+                                log.info("rcloud-云主机{}绑定EIP[{}]失败，等待下轮重试", serviceNo, publicIpId);
+                            }
+                        }else{
+                            log.info("rcloud-云主机{}创建EIP失败（共享带宽{}可能无资源），等待下轮重试", serviceNo, querySO.getShareId());
                         }
 
                     }
 
+                    if(ip == null){
+                        /** 公网IP尚未分配/绑定成功：返回等待状态，避免无公网IP仍同步成功 **/
+                        QueryDetailVO odvo = QueryDetailVO.builder()
+                                .serviceNo(serviceNo)
+                                .publicIp(null)
+                                .privateIp(privateIp)
+                                .status(0)
+                                .msg("Rcloud实例等待公网IP分配绑定")
+                                .powerState(powerState)
+                                .build();
+                        queryDetailMap.put(serviceNo,odvo);
+                        continue;
+                    }
 
                     if("Yes".equals(instance.getString("AutoRenew"))){//更新主机不自动续费
                         UpdateAuteRenewSO urs = UpdateAuteRenewSO.builder()
@@ -330,7 +380,7 @@ public class RcloudCaller implements BaseCaller{
 
                 for(Object ipObj : ipSet){
                     JSONObject ipJson = JSONObject.fromObject(ipObj);
-                    if("Native".equals(ipJson.getString("Type"))){//原生IP
+                    if("Native".equals(ipJson.getString("Type")) || "EIP".equals(ipJson.getString("Type"))){//原生IP或已绑定EIP
                         ip = ipJson.getString("IP");
                         continue;
                     }
@@ -339,7 +389,6 @@ public class RcloudCaller implements BaseCaller{
                         continue;
                     }
                 }
-
 
                 String osType = instance.getString("OsType").toLowerCase();
                 String account = null;
@@ -390,6 +439,14 @@ public class RcloudCaller implements BaseCaller{
      * @throws Exception
      */
     public RenewVO renew(RenewSO renewSO)throws Exception{
+        /** 官方CreateRenew限制：Quantity范围[1~10]，超范围直接返回失败，不调API **/
+        if(renewSO.getNum() < 1 || renewSO.getNum() > 10){
+            log.info("Rcloud-续费周期[{}]超出官方限制[1~10]，续费终止",renewSO.getNum());
+            return RenewVO.builder()
+                    .code(CommonUtil.FAIL_CODE)
+                    .msg("续费周期超出范围(1~10)")
+                    .build();
+        }
         Map<String,String> param = new TreeMap<>();
         param.put("Action","CreateRenew");
         param.put("PublicKey",pubKey);
@@ -405,6 +462,8 @@ public class RcloudCaller implements BaseCaller{
 
         JSONObject json = JSONObject.fromObject(str);
         if(json.getInt("RetCode") == 0){
+            /** 主机续费成功后同步续费绑定的EIP（避免主机续了EIP过期丢公网IP），失败不影响主机续费结果 **/
+            renewBindEip(renewSO.getInstanceId(), renewSO.getNum());
             return RenewVO.builder()
                     .code(CommonUtil.SUCCESS_CODE)
                     .msg(CommonUtil.SUCCESS_MSG)
@@ -413,8 +472,94 @@ public class RcloudCaller implements BaseCaller{
             log.info("Rcloud-轻量级云主机[{}]实例续费失败：{}",renewSO.getInstanceId(),str);
             return RenewVO.builder()
                     .code(CommonUtil.FAIL_CODE)
-                    .msg(CommonUtil.FAIL_MSG)
+                    .msg("实例续费失败："+str)
                     .build();
+        }
+    }
+
+
+    /**
+     * 查询主机绑定的EIP并同步续费（与liebao同款做法）
+     * 先查主机公网IP，再DescribeEIP按IP过滤拿到EIPId，对EIP CreateRenew（不带ResourceType，与续主机同参）
+     * EIP续费失败只记日志不回滚：主机续费已在云端生效无法撤回，人工按日志补续即可
+     * @param instanceId 主机ID
+     * @param num 续费时长(月)
+     */
+    private void renewBindEip(String instanceId,Integer num){
+        try{
+            /** ① 查主机拿公网IP（Native或已绑定EIP） **/
+            Map<String,String> hostParam = new TreeMap<>();
+            hostParam.put("Action","DescribeUHostInstance");
+            hostParam.put("PublicKey",pubKey);
+            if(StringUtils.isNotEmpty(projectId)){
+                hostParam.put("ProjectId",projectId);
+            }
+            hostParam.put("Region",regionId);
+            hostParam.put("UHostIds.0",instanceId);
+            String hostSignature = getSignature(hostParam,pivKey);
+            hostParam.put("Signature",hostSignature);
+
+            String hostStr = HttpRequest.post(url,hostParam);
+            JSONObject hostJson = JSONObject.fromObject(hostStr);
+            if(hostJson.getInt("RetCode") != 0 || !hostJson.has("UHostSet") || hostJson.getJSONArray("UHostSet").size() == 0){
+                log.info("Rcloud-主机[{}]查询失败，跳过EIP续费：{}",instanceId,hostStr);
+                return;
+            }
+            String publicIp = null;
+            JSONArray ipSet = hostJson.getJSONArray("UHostSet").getJSONObject(0).getJSONArray("IPSet");
+            for(Object ipObj : ipSet){
+                JSONObject ipJson = JSONObject.fromObject(ipObj);
+                if("Native".equals(ipJson.getString("Type")) || "EIP".equals(ipJson.getString("Type"))){
+                    publicIp = ipJson.getString("IP");
+                    break;
+                }
+            }
+            if(publicIp == null){
+                log.info("Rcloud-主机[{}]无公网IP，跳过EIP续费",instanceId);
+                return;
+            }
+
+            /** ② 按IP查EIP拿EIPId（liebao同款：DescribeEIP + IPs.0） **/
+            Map<String,String> queryParam = new TreeMap<>();
+            queryParam.put("Action","DescribeEIP");
+            queryParam.put("PublicKey",pubKey);
+            if(StringUtils.isNotEmpty(projectId)){
+                queryParam.put("ProjectId",projectId);
+            }
+            queryParam.put("Region",regionId);
+            queryParam.put("IPs.0",publicIp);
+            String querySignature = getSignature(queryParam,pivKey);
+            queryParam.put("Signature",querySignature);
+
+            String queryStr = HttpRequest.post(url,queryParam);
+            JSONObject queryJson = JSONObject.fromObject(queryStr);
+            if(queryJson.getInt("RetCode") != 0 || !queryJson.has("EIPSet") || queryJson.getJSONArray("EIPSet").size() == 0){
+                log.info("Rcloud-主机[{}]公网IP[{}]未查到EIP，跳过EIP续费：{}",instanceId,publicIp,queryStr);
+                return;
+            }
+            String eipId = queryJson.getJSONArray("EIPSet").getJSONObject(0).getString("EIPId");
+
+            /** ③ EIP续费，时长与主机一致（不带ResourceType，与liebao续主机的renew同参） **/
+            Map<String,String> renewParam = new TreeMap<>();
+            renewParam.put("Action","CreateRenew");
+            renewParam.put("PublicKey",pubKey);
+            if(StringUtils.isNotEmpty(projectId)){
+                renewParam.put("ProjectId",projectId);
+            }
+            renewParam.put("ResourceId",eipId);
+            renewParam.put("Quantity",num+"");
+            String renewSignature = getSignature(renewParam,pivKey);
+            renewParam.put("Signature",renewSignature);
+
+            String renewStr = HttpRequest.post(url,renewParam);
+            JSONObject renewJson = JSONObject.fromObject(renewStr);
+            if(renewJson.getInt("RetCode") == 0){
+                log.info("Rcloud-主机[{}]绑定的EIP[{}]续费成功",instanceId,eipId);
+            }else{
+                log.info("Rcloud-主机[{}]绑定的EIP[{}]续费失败（人工补续）：{}",instanceId,eipId,renewStr);
+            }
+        }catch (Exception e){
+            log.info("Rcloud-主机[{}]EIP续费异常（不影响主机续费，人工补续）：{}",instanceId,e.getMessage());
         }
     }
 
@@ -1489,6 +1634,11 @@ public class RcloudCaller implements BaseCaller{
      * @throws Exception
      */
     public Map<String,String> createEip(String shareId,Integer quantity)throws Exception{
+        if(StringUtils.isEmpty(shareId)){
+            log.info("rcloud-创建EIP失败：共享带宽ID(shareId)为空");
+            return null;
+        }
+
         Map<String,String> param = new TreeMap<>();
         param.put("Action","AllocateEIP");
         param.put("PublicKey",pubKey);
@@ -1561,6 +1711,38 @@ public class RcloudCaller implements BaseCaller{
             log.info("Rcloud IP绑定主机请求参数："+JSONObject.fromObject(param).toString());
             log.info("Rcloud IP绑定主机响应结果："+str);
             return false;
+        }
+    }
+
+
+    /**
+     * 释放EIP（主机创建失败时回收预创建的EIP，避免闲置计费）
+     * @param eipId
+     */
+    public void releaseEip(String eipId){
+        try{
+            Map<String,String> param = new TreeMap<>();
+            param.put("Action","ReleaseEIP");//释放IP
+            param.put("PublicKey",pubKey);
+
+            if(StringUtils.isNotEmpty(projectId)){
+                param.put("ProjectId",projectId);
+            }
+            param.put("Region",regionId);
+            param.put("EIPId",eipId);
+
+            String signature = getSignature(param,pivKey);
+            param.put("Signature",signature);
+
+            String str = HttpRequest.post(url,param);
+            JSONObject result = JSONObject.fromObject(str);
+            if(result.getInt("RetCode") == 0){
+                log.info("rcloud-释放EIP[{}]成功",eipId);
+            }else{
+                log.info("rcloud-释放EIP[{}]失败：{}",eipId,str);
+            }
+        }catch (Exception e){
+            log.info("rcloud-释放EIP[{}]异常：{}",eipId,e.getMessage());
         }
     }
 

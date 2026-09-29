@@ -1,11 +1,10 @@
 package com.core.manycloudcommon.utils;
 
-import java.io.File;
-import java.io.FileWriter;
-import java.io.IOException;
-import java.io.Writer;
+import java.io.*;
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 
 public class FileUtil {
 
@@ -41,6 +40,25 @@ public class FileUtil {
             return null;
         }
 
+    }
+
+    /**
+     * 读取文件内容
+     * @param fileName
+     * @return
+     */
+    public static String readFile(String fileName){
+        String path = "/app/upload/file";
+        try {
+            File file = new File(path + "/" + fileName);
+            if (!file.exists()) {
+                return null;
+            }
+            return new String(Files.readAllBytes(Paths.get(file.getAbsolutePath())));
+        } catch (IOException e) {
+            e.printStackTrace();
+            return null;
+        }
     }
 
 }

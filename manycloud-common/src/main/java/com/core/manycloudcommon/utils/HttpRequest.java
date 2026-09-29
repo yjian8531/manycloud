@@ -441,6 +441,106 @@ public class HttpRequest {
     }
 
     /**
+     * 发送 PUT 请求（JSON体），结构同postJson
+     * @param url    :请求接口
+     * @param params :请求参数
+     * @param headers:请求头
+     * @return 返回json结果
+     */
+    public static String putJson(String url, String params,Map<String,String> headers) throws IOException {
+        PrintWriter out = null;
+
+        BufferedReader in = null;
+
+        String result = "";
+
+        try {
+            URL realUrl = new URL(url);
+
+            // 打开和URL之间的连接
+            HttpURLConnection conn = (HttpURLConnection) realUrl.openConnection();
+
+            // PUT方法
+            conn.setRequestMethod("PUT");
+
+            // 设置通用的请求属性
+            conn.setRequestProperty("accept", "*/*");
+            conn.setRequestProperty("connection", "Keep-Alive");
+            conn.setRequestProperty("user-agent","Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1;SV1)");
+            conn.setRequestProperty("Content-Type", "application/json; charset=utf-8");
+            if(headers != null){
+                for(String key : headers.keySet()){
+                    conn.setRequestProperty(key, headers.get(key));
+                }
+            }
+
+
+            // 发送PUT请求必须设置如下两行
+            conn.setDoOutput(true);
+            conn.setDoInput(true);
+
+            // 获取URLConnection对象对应的输出流
+
+            out = new PrintWriter(conn.getOutputStream());
+
+            // 发送请求参数
+            out.print(params);
+
+            // flush输出流的缓冲
+            out.flush();
+            System.out.println("请求结果："+conn.getResponseCode());
+            if(conn.getResponseCode() < 300){
+                // 定义BufferedReader输入流来读取URL的响应
+                in = new BufferedReader(new InputStreamReader(conn.getInputStream()));
+            }else{
+                // 定义BufferedReader输入流来读取URL的响应
+                in = new BufferedReader(new InputStreamReader(conn.getErrorStream()));
+            }
+
+
+            String line;
+
+            while ((line = in.readLine()) != null) {
+                result += line;
+            }
+
+        } catch (Exception e) {
+
+            System.out.println("发送 PUT 请求出现异常！"+e);
+
+            e.printStackTrace();
+
+        }finally{//使用finally块来关闭输出流、输入流
+
+            try{
+
+                if(out!=null){
+
+                    out.close();
+
+                }
+
+                if(in!=null){
+
+                    in.close();
+
+                }
+
+            }
+
+            catch(IOException ex){
+
+                ex.printStackTrace();
+
+            }
+
+        }
+
+        return result;
+
+    }
+
+    /**
      * @param url    :请求接口
      * @return 返回json结果
      */

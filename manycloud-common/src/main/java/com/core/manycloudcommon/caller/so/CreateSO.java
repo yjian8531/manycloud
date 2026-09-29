@@ -35,6 +35,8 @@ public class CreateSO {
     private String machineType;
     /** 防火墙ID **/
     private String securityGroupId;
+    /** 共享带宽ID(Rcloud平台EIP用，下单前先预创建EIP) **/
+    private String shareId;
 
     /** AWS专用标识：特殊用户标识（用于区分是否跳过EIP创建） **/
     private Integer awsSpecialFlag;

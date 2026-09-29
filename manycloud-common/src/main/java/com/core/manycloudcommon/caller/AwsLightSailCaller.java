@@ -129,14 +129,12 @@ public class AwsLightSailCaller implements BaseCaller{
                 }
                 // 普通用户：先创建EIP，再创建实例
                 else {
-                    // blueprint创建的实例需要自定义密钥对
+                    // 每台实例创建独立随机密钥对，pem落盘供用户下载（createQuery返回下载链接）
                     String keyName = CommonUtil.getRandomStr(10);
-                    CreateKeyPairRequest pairRequest = CreateKeyPairRequest.builder()
+                    CreateKeyPairResponse pairResponse = caller.createKeyPair(CreateKeyPairRequest.builder()
                             .keyPairName(keyName)
-                            .build();
-                    CreateKeyPairResponse pairResponse = caller.createKeyPair(pairRequest);
-                    KeyPair keyPair = pairResponse.keyPair();
-                    FileUtil.saveFile(keyPair.name()+".pem",pairResponse.privateKeyBase64());
+                            .build());
+                    FileUtil.saveFile(pairResponse.keyPair().name()+".pem", pairResponse.privateKeyBase64());
 
                     // 先创建EIP
                     String eipId = "eip-"+ str;
@@ -144,16 +142,16 @@ public class AwsLightSailCaller implements BaseCaller{
                             .staticIpName(eipId)
                             .build());
 
-                    // 再创建实例
+                    // 再创建实例（挂独立随机密钥对，pem给用户下载，与createQuery的下载链接配套）
                     caller.createInstances(CreateInstancesRequest.builder()
                             .instanceNames(instanceId)
                             .ipAddressType(IpAddressType.IPV4)
-                            .keyPairName(keyPair.name())
+                            .keyPairName(keyName)
                             .blueprintId(createSO.getImageId())
                             .availabilityZone(zone)
                             .bundleId(bundle)
                             .build());
-                    log.info("AWS LightSail 普通用户创建实例（含EIP）: {}", instanceId);
+                    log.info("AWS LightSail 普通用户创建实例（含EIP，独立密钥）: {}", instanceId);
                 }
 
                 instanceIds.add(instanceId);
@@ -501,6 +499,8 @@ public class AwsLightSailCaller implements BaseCaller{
                 .build();
     }
 
+
+
     /**
      * 修改密码
      * @param updatePwdSO
@@ -512,7 +512,6 @@ public class AwsLightSailCaller implements BaseCaller{
 
         try {
 
-            DownloadDefaultKeyPairResponse keyPairResponse = caller.downloadDefaultKeyPair();
             Instance instance = caller.getInstance(GetInstanceRequest.builder()
                     .instanceName(updatePwdSO.getInstanceId())
                     .build()).instance();
@@ -523,7 +522,8 @@ public class AwsLightSailCaller implements BaseCaller{
             // 创建JSch对象
             JSch jsch = new JSch();
 
-            // AWS返回的是PEM格式密钥，直接使用
+            // 统一使用账户默认密钥对（建机不再创建自定义密钥，实例挂的就是默认密钥）
+            DownloadDefaultKeyPairResponse keyPairResponse = caller.downloadDefaultKeyPair();
             byte[] privateKeyBytes = keyPairResponse.privateKeyBase64().getBytes();
             byte[] publicKeyBytes = keyPairResponse.publicKeyBase64() != null
                     ? keyPairResponse.publicKeyBase64().getBytes() : null;
@@ -567,19 +567,28 @@ public class AwsLightSailCaller implements BaseCaller{
                     "sudo systemctl restart sshd.service"
             };
 
+            boolean cmdFailed = false;
             for (int i = 0; i < command.length; i++) {
                 try {
                     log.info("AWS LightSail set pwd 执行命令:" + command[i]);
                     String s = JSchConnectUtils.execCommand(session, command[i]);
                     if (org.apache.commons.lang.StringUtils.isNotEmpty(s)) {
-                        log.info("AWS LightSail set pwd 执行结果:" + str);
+                        log.info("AWS LightSail set pwd 执行结果:" + s);
                     }
                 } catch (Exception e) {
-                    e.printStackTrace();
+                    // 命令执行失败不能静默当成功，否则密码实际未改成但任务被标记完成
+                    log.error("AWS LightSail set pwd 命令执行失败：{}", e.getMessage(), e);
+                    cmdFailed = true;
                 }
 
             }
             session.disconnect();
+            if (cmdFailed) {
+                return UpdatePwdVO.builder()
+                        .code(CommonUtil.FAIL_CODE)
+                        .msg("密码设置命令执行失败")
+                        .build();
+            }
             return UpdatePwdVO.builder()
                     .code(CommonUtil.SUCCESS_CODE)
                     .msg(CommonUtil.SUCCESS_MSG)

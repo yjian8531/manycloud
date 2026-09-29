@@ -2,6 +2,7 @@ package com.core.manycloudtimer.job;
 
 
 import com.core.manycloudcommon.caller.BaseCaller;
+import com.core.manycloudcommon.caller.OracleCaller;
 import com.core.manycloudcommon.caller.UcloudCaller;
 import com.core.manycloudcommon.caller.so.*;
 import com.core.manycloudcommon.caller.vo.QueryDetailVO;
@@ -88,6 +89,9 @@ public class CreateInstanceTimer {
 
     @Autowired
     private SysLogMapper sysLogMapper;
+
+    @Autowired
+    private UserInfoMapper userInfoMapper;
 
     @Value("${base_service.promotionCount}")
     private String promotionCountPath;
@@ -267,8 +271,15 @@ public class CreateInstanceTimer {
                 //处理完成标记
                 boolean bl = false;
 
-                //查询实例信息
-                QueryVO queryVO = caller.query(QuerySO.builder().instanceIds(Arrays.asList(serviceNo)).build());
+                //查询实例信息（AWS普通用户用createQuery，带回ubuntu账号+pem下载链接）
+                boolean awsNormalUser = false;
+                if(PlatformLabelEnum.AWSLS.getLabel().equals(instanceInfo.getLabel())){
+                    UserInfo u = userInfoMapper.selectById(instanceInfo.getUserId());
+                    awsNormalUser = !(u != null && u.getType() != null && u.getType() == 4);
+                }
+                QueryVO queryVO = awsNormalUser
+                        ? caller.createQuery(QuerySO.builder().instanceIds(Arrays.asList(serviceNo)).build())
+                        : caller.query(QuerySO.builder().instanceIds(Arrays.asList(serviceNo)).build());
                 QueryDetailVO queryDetailVO = queryVO.getQueryDetailMap().get(serviceNo);
 
                 if(PlatformLabelEnum.ALIYUN.getLabel().equals(instanceInfo.getLabel())){
@@ -308,24 +319,36 @@ public class CreateInstanceTimer {
 
                 }else if(PlatformLabelEnum.AWSLS.getLabel().equals(instanceInfo.getLabel())){
 
-                    /** AWS主机 创建完成后需要SSH设置root密码（照阿里云模式：改密成功才算完成） **/
+                    /** AWS主机：特殊用户SSH设置root密码；普通用户不改密（ubuntu+默认密钥pem登录），RUNNING即完成 **/
+
+                    //查询下单用户类型（type=4为特殊用户）
+                    UserInfo userInfo = userInfoMapper.selectById(instanceInfo.getUserId());
+                    boolean isAwsSpecialUser = (userInfo != null && userInfo.getType() != null && userInfo.getType() == 4);
 
                     if("N".equals(timerTask.getTag())){//未改密
 
                         if(PowerStateEnum.RUNNING.getVal().equals(queryDetailVO.getPowerState())){
-                            /** 运行中主机直接SSH改root密码 **/
-                            UpdatePwdSO updatePwdSO = UpdatePwdSO.builder()
-                                    .instanceId(serviceNo)
-                                    .pwd(instanceInfo.getConnectPwd())
-                                    .build();
-                            UpdatePwdVO up = caller.updatePwd(updatePwdSO);
-                            if(CommonUtil.SUCCESS_CODE.equals(up.getCode())){
-                                timerTask.setTag("Y");//标记已改密
+
+                            if(isAwsSpecialUser){
+                                /** 特殊用户：运行中主机直接SSH改root密码 **/
+                                UpdatePwdSO updatePwdSO = UpdatePwdSO.builder()
+                                        .instanceId(serviceNo)
+                                        .pwd(instanceInfo.getConnectPwd())
+                                        .build();
+                                UpdatePwdVO up = caller.updatePwd(updatePwdSO);
+                                if(CommonUtil.SUCCESS_CODE.equals(up.getCode())){
+                                    timerTask.setTag("Y");//标记已改密
+                                    timerTask.setUpdateTime(new Date());
+                                    timerTaskMapper.updateByPrimaryKeySelective(timerTask);
+                                }else{
+                                    log.info("AWS实例[{}]初始化设置root密码失败：{}", serviceNo, up.getMsg());
+                                    //失败下个周期自动重试（tag仍为N）
+                                }
+                            }else{
+                                /** 普通用户：不改密，直接标记完成（账号/pem链接由createQuery带回） **/
+                                timerTask.setTag("Y");
                                 timerTask.setUpdateTime(new Date());
                                 timerTaskMapper.updateByPrimaryKeySelective(timerTask);
-                            }else{
-                                log.info("AWS实例[{}]初始化设置root密码失败：{}", serviceNo, up.getMsg());
-                                //失败下个周期自动重试（tag仍为N）
                             }
                         }
 
@@ -337,6 +360,59 @@ public class CreateInstanceTimer {
 
                     }
 
+                }else if(PlatformLabelEnum.TENCENTLH.getLabel().equals(instanceInfo.getLabel())){
+                    /** 腾讯云轻量 创建时不支持设置密码，需创建后重置。
+                     *  ResetInstancesPassword 为异步接口，建议先关机再重置；重置完成后实例处于关机态，需再开机。
+                     *  拆成两段(tag N/Y)：让开机在后续轮询里重试，避免异步改密未完成时开机失败导致卡死。 **/
+                    if("N".equals(timerTask.getTag())){//尚未重置密码
+                        if(PowerStateEnum.RUNNING.getVal().equals(queryDetailVO.getPowerState())){
+                            /** 运行中：先关机（腾讯建议先关机再重置） **/
+                            log.info("腾讯云轻量 实例[{}]：运行中，开始关机以便重置密码",serviceNo);
+                            caller.stop(StopSO.builder().instanceId(serviceNo).build());
+                        }else if(PowerStateEnum.HALTED.getVal().equals(queryDetailVO.getPowerState())){
+                            /** 已关机：重置密码（异步，重置后仍为关机态） **/
+                            log.info("腾讯云轻量 实例[{}]：已关机，开始重置密码",serviceNo);
+                            UpdatePwdSO updatePwdSO = UpdatePwdSO.builder()
+                                    .instanceId(serviceNo)
+                                    .pwd(instanceInfo.getConnectPwd())
+                                    .build();
+                            UpdatePwdVO up = caller.updatePwd(updatePwdSO);
+                            if(CommonUtil.SUCCESS_CODE.equals(up.getCode())){
+                                log.info("腾讯云轻量 实例[{}]：密码重置请求成功，等待下轮开机",serviceNo);
+                                timerTask.setTag("Y");//密码重置已请求，下一阶段开机
+                                timerTask.setUpdateTime(new Date());
+                                timerTaskMapper.updateByPrimaryKeySelective(timerTask);
+                            }else{
+                                log.info("腾讯云轻量 实例[{}]：密码重置失败：{}",serviceNo,up.getMsg());
+                            }
+                        }
+                    }else if("Y".equals(timerTask.getTag())){//已重置密码，等待开机就绪
+                        if(PowerStateEnum.RUNNING.getVal().equals(queryDetailVO.getPowerState())){
+                            log.info("腾讯云轻量 实例[{}]：已重新开机运行，初始化完成",serviceNo);
+                            bl = true;//已运行 -> 完成
+                        }else if(PowerStateEnum.HALTED.getVal().equals(queryDetailVO.getPowerState())){
+                            /** 关机态：开机（异步重置可能尚未完成，失败则下轮重试） **/
+                            log.info("腾讯云轻量 实例[{}]：密码已重置，开始开机（失败则下轮重试）",serviceNo);
+                            caller.start(StartSO.builder().instanceId(serviceNo).build());
+                        }
+                    }
+
+                }else if(PlatformLabelEnum.ORACLE.getLabel().equals(instanceInfo.getLabel())){
+                    /** Oracle 创建时不支持设置密码（创建时注入固定公钥）。
+                     *  运行后用固定私钥SSH进去改root密码并开启密码登录（opc账号操作），机器保持运行中无需开关机，改密成功即完成。 **/
+                    if(queryDetailVO != null && queryDetailVO.getStatus() == 1
+                            && PowerStateEnum.RUNNING.getVal().equals(queryDetailVO.getPowerState())
+                            && StringUtils.isNotEmpty(queryDetailVO.getPublicIp())){
+                        boolean sshBl = ((OracleCaller)caller).setRootPwdBySsh(queryDetailVO.getPublicIp(), instanceInfo.getConnectPwd());
+                        if(sshBl){
+                            log.info("Oracle 实例[{}]：root密码已设置，初始化完成",serviceNo);
+                            timerTask.setTag("Y");//改密完成
+                            bl = true;//完成
+                        }else{
+                            log.info("Oracle 实例[{}]：SSH改密失败，下轮重试",serviceNo);
+                        }
+                    }
+                    /** 未运行/公网IP未就绪：等下轮再试 **/
                 }
 
 
@@ -344,8 +420,10 @@ public class CreateInstanceTimer {
                     /** 实例创建完成 **/
                     complete(instanceInfo,serviceNo,queryDetailVO,nodeInfo.getNodeName());
 
-                    /** AWS实例连接账号显示为root（complete里写入的是平台默认账号） **/
-                    if(PlatformLabelEnum.AWSLS.getLabel().equals(instanceInfo.getLabel())){
+                    /** AWS特殊用户实例连接账号显示为root（普通用户保持createQuery带回的ubuntu+pem链接） **/
+                    UserInfo awsUser = userInfoMapper.selectById(instanceInfo.getUserId());
+                    if(PlatformLabelEnum.AWSLS.getLabel().equals(instanceInfo.getLabel())
+                            && awsUser != null && awsUser.getType() != null && awsUser.getType() == 4){
                         InstanceInfo ist = new InstanceInfo();
                         ist.setId(instanceInfo.getId());
                         ist.setConnectAccount("root");

@@ -32,12 +32,12 @@ public interface BaseCaller {
             case "IPLIGHT":
                 caller = IpLightCaller.getClient(accountApi);
                 break;
-//            case "TENCENTLH":
-//                caller = TencentLighthouseCaller.getClient(accountApi);
-//                break;
-//            case "ORACLE":
-//                caller = OracleCaller.getClient(accountApi);
-//                break;
+            case "TENCENTLH":
+                caller = TencentLighthouseCaller.getClient(accountApi);
+                break;
+            case "ORACLE":
+                caller = OracleCaller.getClient(accountApi);
+                break;
             default:
                 caller = null;
         }

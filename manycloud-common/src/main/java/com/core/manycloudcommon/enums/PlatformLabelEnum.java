@@ -8,7 +8,9 @@ public enum PlatformLabelEnum {
     RCLOUD("Rcloud","RCLOUD",false,true),
     DOPLA("数字海洋","DOPLA",false,false),
     AKMPLA("阿卡麦","AKMPLA",false,false),
-    IPLIGHT("IPLIGHT","IPLIGHT",false,false);
+    IPLIGHT("IPLIGHT","IPLIGHT",false,false),
+    TENCENTLH("腾讯云轻量","TENCENTLH",true,false),
+    ORACLE("Oracle云","ORACLE",true,false);
 
 
     private String name;
