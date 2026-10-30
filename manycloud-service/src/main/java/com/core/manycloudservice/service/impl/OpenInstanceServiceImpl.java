@@ -45,6 +45,9 @@ import java.util.*;
 @Service
 public class OpenInstanceServiceImpl implements OpenInstanceService {
 
+    /** 特殊用户固定折扣：写死6折，不走用户等级折扣 **/
+    private static final BigDecimal SPECIAL_DISCOUNT = new BigDecimal("0.6");
+
     @Autowired
     private OrderService orderService;
     @Autowired
@@ -163,10 +166,11 @@ public class OpenInstanceServiceImpl implements OpenInstanceService {
                     .num(apiOrderSO.getQuantity())
                     .period(1)//计费周期类型固定按月
                     .duration(apiOrderSO.getPeriod())//购买几个月
-                    .userId(userId)
+                    //不传userId：特殊用户不走等级折扣，价格写死按6折计
                     .build();
 
-            BigDecimal price = orderService.queryOrderPrice(tempOrderSO);
+            BigDecimal price = orderService.queryOrderPrice(tempOrderSO)
+                    .multiply(SPECIAL_DISCOUNT).setScale(2, BigDecimal.ROUND_UP);
             if(price == null || price.compareTo(BigDecimal.valueOf(0)) < 1){
                 return new ResultMessage(ResultMessage.FAILED_CODE, "无效金额");
             }
@@ -187,7 +191,7 @@ public class OpenInstanceServiceImpl implements OpenInstanceService {
             orderInfo.setModelId(apiOrderSO.getModelId());
             orderInfo.setPrice(price);
             orderInfo.setOnlyPrice(price.divide(BigDecimal.valueOf(apiOrderSO.getQuantity()), 2, BigDecimal.ROUND_DOWN));
-            orderInfo.setDiscount(BigDecimal.valueOf(0));
+            orderInfo.setDiscount(SPECIAL_DISCOUNT);
             orderInfo.setType(0);
             orderInfo.setNodeId(apiOrderSO.getNodeId());
             orderInfo.setLabel(nodeInfo.getLabel());
@@ -502,8 +506,8 @@ public class OpenInstanceServiceImpl implements OpenInstanceService {
         if(info == null){
             return new ResultMessage(ResultMessage.FAILED_CODE, "主机不存在或无权访问");
         }
-        // 复用现有续费流程（内部按 instanceInfo.userId 处理余额，与特殊用户一致）
-        return orderService.renew(renewSO);
+        // 复用现有续费流程（内部按 instanceInfo.userId 处理余额，与特殊用户一致），价格写死6折不走等级折扣
+        return orderService.renew(renewSO, SPECIAL_DISCOUNT);
     }
 
     @Override
@@ -814,10 +818,11 @@ public class OpenInstanceServiceImpl implements OpenInstanceService {
                             .num(regionOrder.getQuantity())
                             .period(1)//计费周期类型固定按月
                             .duration(regionOrder.getPeriod())//购买几个月
-                            .userId(userId)
+                            //不传userId：特殊用户不走等级折扣，价格写死按6折计
                             .build();
 
-                    BigDecimal regionPrice = orderService.queryOrderPrice(tempOrderSO);
+                    BigDecimal regionPrice = orderService.queryOrderPrice(tempOrderSO)
+                            .multiply(SPECIAL_DISCOUNT).setScale(2, BigDecimal.ROUND_UP);
                     if(regionPrice != null && regionPrice.compareTo(BigDecimal.ZERO) > 0){
                         regionPriceMap.put(regionOrder.getNodeId(), regionPrice);
                         totalEstimatedAmount = totalEstimatedAmount.add(regionPrice);
@@ -932,7 +937,7 @@ public class OpenInstanceServiceImpl implements OpenInstanceService {
                     regionOrderInfo.setModelId(regionOrder.getModelId());
                     regionOrderInfo.setPrice(regionTotalPrice);
                     regionOrderInfo.setOnlyPrice(regionTotalPrice.divide(BigDecimal.valueOf(regionOrder.getQuantity()), 2, BigDecimal.ROUND_DOWN));
-                    regionOrderInfo.setDiscount(BigDecimal.valueOf(0));
+                    regionOrderInfo.setDiscount(SPECIAL_DISCOUNT);
                     regionOrderInfo.setType(0);
                     regionOrderInfo.setNodeId(regionOrder.getNodeId());
                     regionOrderInfo.setLabel(nodeInfo.getLabel());

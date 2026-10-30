@@ -651,6 +651,10 @@ public class OrderServiceImpl implements OrderService {
      * @return
      */
     public BigDecimal queryRenewPrice(RenewSO renewSO){
+        return queryRenewPrice(renewSO, null);
+    }
+
+    public BigDecimal queryRenewPrice(RenewSO renewSO, BigDecimal forceDiscount){
         InstanceInfo instanceInfo = instanceInfoMapper.selectById(renewSO.getInstanceId());
         OrderSO orderSO = OrderSO.builder()
                 .nodeId(instanceInfo.getNodeId())
@@ -662,11 +666,15 @@ public class OrderServiceImpl implements OrderService {
                 .num(1)
                 .period(instanceInfo.getPeriod())
                 .duration(renewSO.getDuration())
-                .userId(instanceInfo.getUserId())
+                //固定折扣时跳过用户等级折扣，拿到原价后再乘折扣
+                .userId(forceDiscount != null ? null : instanceInfo.getUserId())
                 .build();
 
         /** 获取续费价格 **/
         BigDecimal price = queryOrderPrice(orderSO);
+        if(forceDiscount != null){
+            price = price.multiply(forceDiscount).setScale(2, BigDecimal.ROUND_UP);
+        }
         return price;
     }
     /***
@@ -688,10 +696,15 @@ public class OrderServiceImpl implements OrderService {
      */
     @Transactional(rollbackFor = Exception.class)
     public ResultMessage renew(RenewSO renewSO){
+        return renew(renewSO, null);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public ResultMessage renew(RenewSO renewSO, BigDecimal forceDiscount){
         InstanceInfo instanceInfo = instanceInfoMapper.selectById(renewSO.getInstanceId());
 
         /** 获取续费价格 **/
-        BigDecimal price = queryRenewPrice(renewSO);
+        BigDecimal price = queryRenewPrice(renewSO, forceDiscount);
 
         if(price.compareTo(BigDecimal.valueOf(0)) < 1){
             return new ResultMessage(ResultMessage.FAILED_CODE,"无效金额，不支持续费。");

@@ -76,6 +76,14 @@ public interface OrderService {
      */
     BigDecimal queryRenewPrice(RenewSO renewSO);
 
+    /***
+     * 查询续费价格（forceDiscount不为空时不走用户等级折扣，直接用该折扣计价）
+     * @param renewSO
+     * @param forceDiscount 固定折扣，null则按用户等级折扣
+     * @return
+     */
+    BigDecimal queryRenewPrice(RenewSO renewSO, BigDecimal forceDiscount);
+
 
 
     /***
@@ -84,5 +92,13 @@ public interface OrderService {
      * @return
      */
     ResultMessage renew(RenewSO renewSO);
+
+    /***
+     * 续费（forceDiscount不为空时按固定折扣计价，不走用户等级折扣）
+     * @param renewSO
+     * @param forceDiscount 固定折扣，null则按用户等级折扣
+     * @return
+     */
+    ResultMessage renew(RenewSO renewSO, BigDecimal forceDiscount);
 
 }
