@@ -45,8 +45,8 @@ import java.util.*;
 @Service
 public class OpenInstanceServiceImpl implements OpenInstanceService {
 
-    /** 特殊用户固定折扣：写死6折，不走用户等级折扣 **/
-    private static final BigDecimal SPECIAL_DISCOUNT = new BigDecimal("0.6");
+    /** 特殊用户固定折扣：写死5.5折，不走用户等级折扣 **/
+    private static final BigDecimal SPECIAL_DISCOUNT = new BigDecimal("0.55");
 
     @Autowired
     private OrderService orderService;
@@ -166,7 +166,7 @@ public class OpenInstanceServiceImpl implements OpenInstanceService {
                     .num(apiOrderSO.getQuantity())
                     .period(1)//计费周期类型固定按月
                     .duration(apiOrderSO.getPeriod())//购买几个月
-                    //不传userId：特殊用户不走等级折扣，价格写死按6折计
+                    //不传userId：特殊用户不走等级折扣，价格写死按SPECIAL_DISCOUNT计
                     .build();
 
             BigDecimal price = orderService.queryOrderPrice(tempOrderSO)
@@ -506,7 +506,7 @@ public class OpenInstanceServiceImpl implements OpenInstanceService {
         if(info == null){
             return new ResultMessage(ResultMessage.FAILED_CODE, "主机不存在或无权访问");
         }
-        // 复用现有续费流程（内部按 instanceInfo.userId 处理余额，与特殊用户一致），价格写死6折不走等级折扣
+        // 复用现有续费流程（内部按 instanceInfo.userId 处理余额，与特殊用户一致），价格按SPECIAL_DISCOUNT写死不走等级折扣
         return orderService.renew(renewSO, SPECIAL_DISCOUNT);
     }
 
@@ -818,7 +818,7 @@ public class OpenInstanceServiceImpl implements OpenInstanceService {
                             .num(regionOrder.getQuantity())
                             .period(1)//计费周期类型固定按月
                             .duration(regionOrder.getPeriod())//购买几个月
-                            //不传userId：特殊用户不走等级折扣，价格写死按6折计
+                            //不传userId：特殊用户不走等级折扣，价格写死按SPECIAL_DISCOUNT计
                             .build();
 
                     BigDecimal regionPrice = orderService.queryOrderPrice(tempOrderSO)
