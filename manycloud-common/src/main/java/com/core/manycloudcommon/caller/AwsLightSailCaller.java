@@ -111,6 +111,8 @@ public class AwsLightSailCaller implements BaseCaller{
         boolean isSpecialUser = (createSO.getAwsSpecialFlag() != null);
 
         for(int i = 0 ; i < createSO.getNum() ; i++){
+            // 本轮已创建的EIP名（失败时回收用；特殊用户流程不建EIP保持null）
+            String eipId = null;
             try {
                 String str = CommonUtil.getRandomStr(12);
                 String instanceId = "aws-"+ str;
@@ -137,7 +139,7 @@ public class AwsLightSailCaller implements BaseCaller{
                     FileUtil.saveFile(pairResponse.keyPair().name()+".pem", pairResponse.privateKeyBase64());
 
                     // 先创建EIP
-                    String eipId = "eip-"+ str;
+                    eipId = "eip-"+ str;
                     AllocateStaticIpResponse response = caller.allocateStaticIp(AllocateStaticIpRequest.builder()
                             .staticIpName(eipId)
                             .build());
@@ -158,6 +160,19 @@ public class AwsLightSailCaller implements BaseCaller{
             }catch (Exception e){
                 log.info("AWS LightSail 创建实例失败：{}",e.getMessage());
                 e.printStackTrace();
+                /** 创建失败时回收本轮已创建的EIP，避免留孤儿IP
+                 *  （若失败发生在EIP创建之前eipId为null不处理；回收失败只记日志不再抛出，
+                 *   因为存在"实例已建成功但后续步骤失败"的窗口，此时IP应保留） **/
+                if(eipId != null){
+                    try{
+                        caller.releaseStaticIp(ReleaseStaticIpRequest.builder()
+                                .staticIpName(eipId)
+                                .build());
+                        log.info("AWS LightSail 创建失败，已回收EIP[{}]", eipId);
+                    }catch (Exception ex){
+                        log.info("AWS LightSail EIP[{}]回收失败（可能实例已建，保留）", eipId);
+                    }
+                }
             }
         }
         if(instanceIds.size() > 0){
@@ -455,8 +470,9 @@ public class AwsLightSailCaller implements BaseCaller{
                     .instanceName(destroySO.getInstanceId())
                     .build());
 
-            /** 查询IP信息 **/
-            String eipId = destroySO.getInstanceId().replace("ws-","eip-");
+            /** 查询IP信息（实例名aws-xxx与EIP名eip-xxx后缀一致，之前误用replace("ws-","eip-")
+             *  拼成aeip-xxx永远查不到，导致销毁后EIP不释放、账号里堆积未绑定IP，已修正） **/
+            String eipId = destroySO.getInstanceId().replace("aws-","eip-");
             boolean bl = true;
             try{
                 /** 查询EIP 验证其EIP是否存在 **/
@@ -470,6 +486,7 @@ public class AwsLightSailCaller implements BaseCaller{
                 caller.releaseStaticIp(ReleaseStaticIpRequest.builder()
                         .staticIpName(eipId)
                         .build());
+                log.info("AWS主机[{}]销毁后已释放EIP[{}]", destroySO.getInstanceId(), eipId);
             }
 
             return DestroyVO.builder()
